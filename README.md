@@ -36,7 +36,7 @@ The application is built with Next.js, TypeScript, and Prisma, and it uses a loc
 
     ```bash
     git clone <repository-url>
-    cd journal_analyzer
+    cd synapse
     ```
 
 2.  **Install dependencies:**
