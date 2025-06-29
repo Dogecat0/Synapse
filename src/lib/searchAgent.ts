@@ -1,6 +1,7 @@
 // src/lib/searchAgent.ts
 
 import { OpenAI } from 'openai';
+import * as z from 'zod';
 
 // --- LLM Configuration ---
 const LLM_API_URL = 'http://localhost:11434/v1/';
@@ -9,6 +10,11 @@ const LLM_MODEL = 'gemma3n:latest';
 const openai = new OpenAI({
     baseURL: LLM_API_URL,
     apiKey: 'ollama',
+});
+
+// --- Zod Schemas ---
+const SearchTermsSchema = z.object({
+    keywords: z.array(z.string()).min(3).max(7).describe("An array of 3 to 7 relevant keywords for a database search."),
 });
 
 // --- Helper Types ---
@@ -68,11 +74,14 @@ export async function generateSearchTerms(query: string): Promise<string[]> {
         console.log(`[SearchAgent] LLM raw response: ${content}`);
         const parsedJson = JSON.parse(content);
 
-        if (!parsedJson.keywords || !Array.isArray(parsedJson.keywords)) {
-            throw new Error('LLM response did not contain a "keywords" array.');
+        const validationResult = SearchTermsSchema.safeParse(parsedJson);
+
+        if (!validationResult.success) {
+            console.error('[SearchAgent] LLM response failed Zod validation:', validationResult.error);
+            throw new Error('LLM response did not match expected schema.');
         }
 
-        const keywords: string[] = parsedJson.keywords.filter((k: any) => typeof k === 'string' && k.trim() !== '');
+        const keywords = validationResult.data.keywords.filter((k: any) => typeof k === 'string' && k.trim() !== '');
         
         console.log(`[SearchAgent] Generated keywords:`, keywords);
         return keywords;
