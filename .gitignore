@@ -6,3 +6,4 @@ prisma/dev.db
 repomix-output.xml
 .next/
 *.txt
+/roadmap/
