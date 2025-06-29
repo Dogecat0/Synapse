@@ -46,16 +46,16 @@ Please provide only the raw JSON output.`;
 
 // Define Zod schema for activity
 const ActivitySchema = z.object({
-  description: z.string().min(1, "Description is required"),
-  duration: z.number().nullable(),
-  notes: z.string().nullable(),
-  tags: z.string()
+  description: z.string().min(1, "Description is required").describe("A concise summary of the activity"),
+  duration: z.number().nullable().describe("Duration in minutes; null if not specified"),
+  notes: z.string().nullable().describe("Additional notes or context for the activity"),
+  tags: z.string().describe("Comma-separated list of tags")
 });
 
 // Define schema for the entire response
 const JournalDataSchema = z.object({
-  workActivities: z.array(ActivitySchema),
-  lifeActivities: z.array(ActivitySchema)
+  workActivities: z.array(ActivitySchema).describe("Activities related to work"),
+  lifeActivities: z.array(ActivitySchema).describe("Activities related to personal life")
 }).required()
 
 /**
@@ -63,9 +63,7 @@ const JournalDataSchema = z.object({
  * @param {string} entryText - The text for a single journal entry.
  * @returns {Promise<object | null>} - The structured data or null on failure.
  */
-async function transformTextWithLLM(entryText) {
-    const schema = z.toJSONSchema(JournalDataSchema)    
-    // schema.type = "json_object";
+async function transformTextWithLLM(entryText, schema) {
     const prompt = createLLMPrompt(entryText, schema);
 
     try {
@@ -142,11 +140,13 @@ async function main() {
 
     try {
         const journalText = fs.readFileSync(JOURNAL_FILE_PATH, 'utf-8');
+        const schema = z.toJSONSchema(JournalDataSchema);
 
         // Split the entire file into entries based on the date headers.
         const entries = journalText.split(/\n(?=\d{4}-\d{2}-\d{2})/).map(e => e.trim());
 
         console.log(`Found ${entries.length} entries to process.`);
+        console.log(`Using schema:\n${JSON.stringify(schema, null, 2)}`);
 
         for (const entryText of entries) {
             if (!entryText) continue;
@@ -156,7 +156,7 @@ async function main() {
             const resp_content = lines.slice(1).join('\n');
 
             // Use LLM to process the resp_content
-            const structuredData = await transformTextWithLLM(resp_content);
+            const structuredData = await transformTextWithLLM(resp_content, schema);
             console.log(structuredData);
 
             if (!structuredData) {
