@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model JournalEntry {
@@ -19,13 +19,14 @@ model JournalEntry {
 }
 
 model Activity {
-  id          String   @id @default(cuid())
+  id          String                      @id @default(cuid())
   description String
   duration    Int? // Duration in minutes
   notes       String?
   category    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  embedding   Unsupported("vector(384)")? // Example for a 384-dimension embedding
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
 
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id])
   journalEntryId String
@@ -38,4 +39,3 @@ model Tag {
   name       String     @unique
   activities Activity[]
 }
-
