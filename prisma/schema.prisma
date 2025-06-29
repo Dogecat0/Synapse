@@ -19,14 +19,13 @@ model JournalEntry {
 }
 
 model Activity {
-  id          String                      @id @default(cuid())
+  id          String   @id @default(cuid())
   description String
   duration    Int? // Duration in minutes
   notes       String?
   category    String
-  embedding   Unsupported("vector(384)")? // Example for a 384-dimension embedding
-  createdAt   DateTime                    @default(now())
-  updatedAt   DateTime                    @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id])
   journalEntryId String
