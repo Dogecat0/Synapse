@@ -33,7 +33,7 @@ interface Activity {
 }
 
 
-// --- Query Planner (Existing Function) ---
+// --- Query Planner Agent---
 
 function createPlannerPrompt(query: string): string {
     return `You are a search query planning assistant for a personal journal. Your task is to analyze a user's natural language query and convert it into a JSON object containing an array of precise keywords. These keywords will be used for a database full-text search.
@@ -95,6 +95,8 @@ export async function generateSearchTerms(query: string): Promise<string[]> {
     }
 }
 
+// --- Reranker Agent ---
+
 const RerankSchema = z.object({
     ranked_ids: z.array(z.string()).describe("An array of activity IDs, sorted from most to least relevant to the user's query. Return an empty array if no activities are relevant.")
 }).required();
@@ -127,11 +129,11 @@ Notes: ${act.notes || 'No notes.'}
 Answer the user's query directly and professionally. Use a helpful, insightful tone.
 
 Rules:
-- Base your entire answer on the provided context. Do not make up information.
-- If the context does not contain enough information to answer, state that clearly.
-- Structure your answer in markdown format. Use bullet points for key findings or timelines.
-- Refer to specific details like duration, dates, and project names from the context.
-- Keep the summary focused and under 150 words.
+- Your entire answer MUST be based on the provided context. Do not invent or infer information not present in the entries.
+- If the context is insufficient to answer the query, explicitly state that. For example: "Based on the provided entries, I cannot determine the progress on the API refactor."
+- Structure your answer in markdown format. Use headings for different sections (e.g., "Progress," "Blockers," "Time Spent") if applicable. Use bullet points for timelines or key findings.
+- Directly reference specific details from the context, such as duration, dates, and project names, to support your summary.
+- Keep the summary focused and concise, ideally under 150 words.
 
 User Query: "${query}"
 
