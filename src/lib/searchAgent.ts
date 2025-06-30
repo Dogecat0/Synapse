@@ -1,7 +1,7 @@
 // src/lib/searchAgent.ts
 
 import { OpenAI } from 'openai';
-import * as z from 'zod';
+import * as z from 'zod/v4';
 
 // --- LLM Configuration ---
 const LLM_API_URL = 'http://localhost:11434/v1/';
@@ -14,7 +14,10 @@ const openai = new OpenAI({
 
 // --- Zod Schemas ---
 const SearchTermsSchema = z.object({
-    keywords: z.array(z.string()).min(3).max(7).describe("An array of 3 to 7 relevant keywords for a database search."),
+    keywords: z.array(z.string().describe("A single search keyword. Should be a noun, verb, or specific identifier. Avoid generic words."))
+        .min(3)
+        .max(7)
+        .describe("An array of 3 to 7 relevant keywords for a database search. Include synonyms and technical terms."),
 });
 
 // --- Helper Types ---
@@ -92,8 +95,9 @@ export async function generateSearchTerms(query: string): Promise<string[]> {
     }
 }
 
-
-// --- NEW: Synthesizer Agent ---
+const RerankSchema = z.object({
+    ranked_ids: z.array(z.string()).describe("An array of activity IDs, sorted from most to least relevant to the user's query. Return an empty array if no activities are relevant.")
+}).required();
 
 /**
  * Creates a prompt for the LLM to synthesize a summary from a list of activities.
