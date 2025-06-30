@@ -22,6 +22,7 @@ const SearchTermsSchema = z.object({
 
 // --- Helper Types ---
 interface Activity {
+    id: string;
     description: string;
     duration: number | null;
     notes: string | null;
@@ -100,6 +101,100 @@ export async function generateSearchTerms(query: string): Promise<string[]> {
 const RerankSchema = z.object({
     ranked_ids: z.array(z.string()).describe("An array of activity IDs, sorted from most to least relevant to the user's query. Return an empty array if no activities are relevant.")
 }).required();
+
+function createRerankerPrompt(query: string, activities: Activity[]): string {
+    const activityContext = activities.map(act => ({
+        id: act.id,
+        description: act.description,
+        notes: act.notes ? act.notes.substring(0, 200) + '...' : 'No notes.'
+    }));
+
+    return `You are a relevance ranking assistant. Your task is to analyze a list of journal activities and rank them based on their relevance to a user's query.
+
+Your output must be a JSON object that strictly conforms to the provided JSON Schema. The output should be an array of the original activity IDs, sorted from most to least relevant.
+
+User Query: "${query}"
+
+Candidate Activities (JSON with IDs):
+${JSON.stringify(activityContext, null, 2)}
+
+Your JSON Output:
+`;
+}
+
+export async function rerankActivities(query: string, activities: Activity[]): Promise<Activity[]> {
+    if (activities.length === 0) {
+        return [];
+    }
+
+    const BATCH_SIZE = 10;
+    const allRankedIds: string[] = [];
+    const schema = z.toJSONSchema(RerankSchema);
+
+    console.log(`[SearchAgent] Starting re-ranking for ${activities.length} activities in batches of ${BATCH_SIZE}...`);
+
+    for (let i = 0; i < activities.length; i += BATCH_SIZE) {
+        const batch = activities.slice(i, i + BATCH_SIZE);
+        const prompt = createRerankerPrompt(query, batch);
+        
+        console.log(`[SearchAgent] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}...`);
+
+        try {
+            const completion = await openai.chat.completions.create({
+                model: LLM_MODEL,
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.0,
+                response_format: {
+                    type: "json_schema",
+                    json_schema: {
+                        name: 'rerank_activities',
+                        schema: schema,
+                        strict: true
+                    }
+                },
+            }) as OpenAI.Chat.Completions.ChatCompletion;
+
+            const content = completion.choices[0].message.content;
+            if (!content) {
+                console.warn(`[SearchAgent] LLM returned an empty response for batch ${i}.`);
+                continue;
+            }
+
+            const parsedJson = JSON.parse(content);
+            const validationResult = RerankSchema.safeParse(parsedJson);
+            
+            if (!validationResult.success) {
+                console.error(`[SearchAgent] Zod validation failed for batch ${i}:`, validationResult.error);
+                continue;
+            }
+            
+            const batchRankedIds = validationResult.data.ranked_ids;
+            allRankedIds.push(...batchRankedIds);
+            console.log(`[SearchAgent] Batch ${Math.floor(i / BATCH_SIZE) + 1} processed, found ${batchRankedIds.length} relevant IDs.`);
+
+        } catch (error) {
+            console.error(`[SearchAgent] Error processing batch starting at index ${i}:`, error);
+            // Continue to next batch
+        }
+    }
+
+    console.log(`[SearchAgent] Re-ranking complete. Total relevant IDs found: ${allRankedIds.length}.`);
+
+    if (allRankedIds.length === 0) {
+        console.warn('[SearchAgent] No relevant activities found after re-ranking. Falling back to top slice of original candidates.');
+        return activities.slice(0, 15);
+    }
+
+    const activityMap = new Map(activities.map(a => [a.id, a]));
+    const rankedActivities = allRankedIds
+        .map(id => activityMap.get(id))
+        .filter(Boolean) as Activity[];
+    
+    return rankedActivities;
+}
+
+
+// --- Synthesizer Agent ---
 
 /**
  * Creates a prompt for the LLM to synthesize a summary from a list of activities.
