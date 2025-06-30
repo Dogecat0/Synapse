@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { generateSearchTerms, generateSummary } from '../../../../lib/searchAgent';
+import { generateSearchTerms, generateSummary, rerankActivities } from '../../../../lib/searchAgent';
 
 const prisma = new PrismaClient();
 
@@ -32,28 +32,24 @@ export async function POST(request: Request) {
             { notes: { contains: term, mode: 'insensitive' as const } },
         ]);
 
-        const relevantActivities = await prisma.activity.findMany({
-            where: {
-                OR: searchFilters,
-            },
+        const candidateActivities = await prisma.activity.findMany({
+            where: { OR: searchFilters },
             include: {
-                journalEntry: {
-                    select: { date: true },
-                },
+                journalEntry: { select: { date: true } },
                 tags: true,
             },
-            orderBy: {
-                journalEntry: {
-                    date: 'desc',
-                },
-            },
-            take: 20,
+            orderBy: { journalEntry: { date: 'desc' } },
+            take: 200, // Fetch a larger set of candidates for batch processing
         });
         
-        // 3. Synthesis Step: Use LLM to generate a summary from the results
-        const summary = await generateSummary(query, relevantActivities);
+        // 3. Agentic Step: Re-ranker
+        const rankedActivities = await rerankActivities(query, candidateActivities);
+        const topActivities = rankedActivities.slice(0, 20); // Take the top N for synthesis
 
-        return NextResponse.json({ summary, activities: relevantActivities, keywords });
+        // 4. Synthesis Step: Use LLM to generate a summary from the results
+        const summary = await generateSummary(query, topActivities);
+
+        return NextResponse.json({ summary, activities: topActivities, keywords });
 
     } catch (error) {
         console.error('[Search API] Error processing search:', error);

@@ -1,7 +1,7 @@
 // src/lib/searchAgent.ts
 
 import { OpenAI } from 'openai';
-import * as z from 'zod';
+import * as z from 'zod/v4';
 
 // --- LLM Configuration ---
 const LLM_API_URL = 'http://localhost:11434/v1/';
@@ -14,11 +14,15 @@ const openai = new OpenAI({
 
 // --- Zod Schemas ---
 const SearchTermsSchema = z.object({
-    keywords: z.array(z.string()).min(3).max(7).describe("An array of 3 to 7 relevant keywords for a database search."),
+    keywords: z.array(z.string().describe("A single search keyword. Should be a noun, verb, or specific identifier. Avoid generic words."))
+        .min(3)
+        .max(7)
+        .describe("An array of 3 to 7 relevant keywords for a database search. Include synonyms and technical terms."),
 });
 
 // --- Helper Types ---
 interface Activity {
+    id: string;
     description: string;
     duration: number | null;
     notes: string | null;
@@ -30,7 +34,7 @@ interface Activity {
 }
 
 
-// --- Query Planner (Existing Function) ---
+// --- Query Planner Agent---
 
 function createPlannerPrompt(query: string): string {
     return `You are a search query planning assistant for a personal journal. Your task is to analyze a user's natural language query and convert it into a JSON object containing an array of precise keywords. These keywords will be used for a database full-text search.
@@ -92,8 +96,105 @@ export async function generateSearchTerms(query: string): Promise<string[]> {
     }
 }
 
+// --- Reranker Agent ---
 
-// --- NEW: Synthesizer Agent ---
+const RerankSchema = z.object({
+    ranked_ids: z.array(z.string()).describe("An array of activity IDs, sorted from most to least relevant to the user's query. Return an empty array if no activities are relevant.")
+}).required();
+
+function createRerankerPrompt(query: string, activities: Activity[]): string {
+    const activityContext = activities.map(act => ({
+        id: act.id,
+        description: act.description,
+        notes: act.notes ? act.notes.substring(0, 200) + '...' : 'No notes.'
+    }));
+
+    return `You are a relevance ranking assistant. Your task is to analyze a list of journal activities and rank them based on their relevance to a user's query.
+
+Your output must be a JSON object that strictly conforms to the provided JSON Schema. The output should be an array of the original activity IDs, sorted from most to least relevant.
+
+User Query: "${query}"
+
+Candidate Activities (JSON with IDs):
+${JSON.stringify(activityContext, null, 2)}
+
+Your JSON Output:
+`;
+}
+
+export async function rerankActivities(query: string, activities: Activity[]): Promise<Activity[]> {
+    if (activities.length === 0) {
+        return [];
+    }
+
+    const BATCH_SIZE = 10;
+    const allRankedIds: string[] = [];
+    const schema = z.toJSONSchema(RerankSchema);
+
+    console.log(`[SearchAgent] Starting re-ranking for ${activities.length} activities in batches of ${BATCH_SIZE}...`);
+
+    for (let i = 0; i < activities.length; i += BATCH_SIZE) {
+        const batch = activities.slice(i, i + BATCH_SIZE);
+        const prompt = createRerankerPrompt(query, batch);
+        
+        console.log(`[SearchAgent] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}...`);
+
+        try {
+            const completion = await openai.chat.completions.create({
+                model: LLM_MODEL,
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.0,
+                response_format: {
+                    type: "json_schema",
+                    json_schema: {
+                        name: 'rerank_activities',
+                        schema: schema,
+                        strict: true
+                    }
+                },
+            }) as OpenAI.Chat.Completions.ChatCompletion;
+
+            const content = completion.choices[0].message.content;
+            if (!content) {
+                console.warn(`[SearchAgent] LLM returned an empty response for batch ${i}.`);
+                continue;
+            }
+
+            const parsedJson = JSON.parse(content);
+            const validationResult = RerankSchema.safeParse(parsedJson);
+            
+            if (!validationResult.success) {
+                console.error(`[SearchAgent] Zod validation failed for batch ${i}:`, validationResult.error);
+                continue;
+            }
+            
+            const batchRankedIds = validationResult.data.ranked_ids;
+            allRankedIds.push(...batchRankedIds);
+            console.log(`[SearchAgent] Batch ${Math.floor(i / BATCH_SIZE) + 1} processed, found ${batchRankedIds.length} relevant IDs.`);
+
+        } catch (error) {
+            console.error(`[SearchAgent] Error processing batch starting at index ${i}:`, error);
+            // Continue to next batch
+        }
+    }
+
+    console.log(`[SearchAgent] Re-ranking complete. Total relevant IDs found: ${allRankedIds.length}.`);
+
+    if (allRankedIds.length === 0) {
+        console.warn('[SearchAgent] No relevant activities found after re-ranking. Falling back to top slice of original candidates.');
+        return activities.slice(0, 15);
+    }
+
+    const activityMap = new Map(activities.map(a => [a.id, a]));
+    const rankedActivities = allRankedIds
+        .map(id => activityMap.get(id))
+        .filter(Boolean) as Activity[];
+    
+    return rankedActivities;
+}
+
+
+// --- Synthesizer Agent ---
 
 /**
  * Creates a prompt for the LLM to synthesize a summary from a list of activities.
@@ -123,11 +224,11 @@ Notes: ${act.notes || 'No notes.'}
 Answer the user's query directly and professionally. Use a helpful, insightful tone.
 
 Rules:
-- Base your entire answer on the provided context. Do not make up information.
-- If the context does not contain enough information to answer, state that clearly.
-- Structure your answer in markdown format. Use bullet points for key findings or timelines.
-- Refer to specific details like duration, dates, and project names from the context.
-- Keep the summary focused and under 150 words.
+- Your entire answer MUST be based on the provided context. Do not invent or infer information not present in the entries.
+- If the context is insufficient to answer the query, explicitly state that. For example: "Based on the provided entries, I cannot determine the progress on the API refactor."
+- Structure your answer in markdown format. Use headings for different sections (e.g., "Progress," "Blockers," "Time Spent") if applicable. Use bullet points for timelines or key findings.
+- Directly reference specific details from the context, such as duration, dates, and project names, to support your summary.
+- Keep the summary focused and concise, ideally under 150 words.
 
 User Query: "${query}"
 
