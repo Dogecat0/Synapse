@@ -7,3 +7,4 @@ repomix-output.xml
 .next/
 *.txt
 /roadmap/
+data/ollama
