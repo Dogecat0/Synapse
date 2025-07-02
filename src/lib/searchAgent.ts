@@ -20,6 +20,18 @@ const SearchTermsSchema = z.object({
         .describe("An array of 3 to 7 relevant keywords for a database search. Include synonyms and technical terms."),
 });
 
+const SummarySchema = z.object({
+    mainSummary: z.string().describe("A concise overview that directly answers the user's query in a helpful, professional tone"),
+    sections: z.array(z.object({
+        title: z.string().describe("Section title (e.g., 'Progress', 'Blockers', 'Time Spent')"),
+        content: z.string().describe("Markdown-formatted content for this section")
+    })).optional().describe("Optional structured sections of the summary with additional details"),
+    timeSpent: z.object({
+        totalMinutes: z.number().optional().describe("The total time spent on this topic in minutes, if calculable from the entries"),
+        breakdown: z.string().optional().describe("A brief breakdown of how time was spent across different activities")
+    }).optional().describe("Information about time allocation, if relevant to the query")
+});
+
 // --- Helper Types ---
 interface Activity {
     id: string;
@@ -195,14 +207,13 @@ export async function rerankActivities(query: string, activities: Activity[]): P
 
 
 // --- Synthesizer Agent ---
-
 /**
- * Creates a prompt for the LLM to synthesize a summary from a list of activities.
+ * Creates a prompt for the LLM to synthesize a structured summary from a list of activities.
  * @param query The original user query.
  * @param activities A list of relevant activities retrieved from the database.
  * @returns The structured prompt for the LLM.
  */
-function createSynthesizerPrompt(query: string, activities: Activity[]): string {
+function createStructuredSynthesizerPrompt(query: string, activities: Activity[], schema: any): string {
     const activityContext = activities.map(act => {
         const date = new Date(act.journalEntry.date).toISOString().split('T')[0];
         const duration = act.duration ? `${act.duration}min` : 'N/A';
@@ -219,62 +230,89 @@ Notes: ${act.notes || 'No notes.'}
         `;
     }).join('');
 
-    return `You are a helpful journal analysis assistant. Your task is to synthesize a concise summary based on a user's query and a set of relevant journal entries provided as context.
+    return `You are a journal analysis assistant. Your task is to synthesize a structured summary based on a user's query and relevant journal entries.
 
-Answer the user's query directly and professionally. Use a helpful, insightful tone.
+You must respond with a JSON object that strictly conforms to the provided JSON Schema.
 
 Rules:
-- Your entire answer MUST be based on the provided context. Do not invent or infer information not present in the entries.
-- If the context is insufficient to answer the query, explicitly state that. For example: "Based on the provided entries, I cannot determine the progress on the API refactor."
-- Structure your answer in markdown format. Use headings for different sections (e.g., "Progress," "Blockers," "Time Spent") if applicable. Use bullet points for timelines or key findings.
-- Directly reference specific details from the context, such as duration, dates, and project names, to support your summary.
-- Keep the summary focused and concise, ideally under 150 words.
+- Base your analysis ONLY on the provided journal entries. Do not invent information.
+- If the entries are insufficient to answer the query, state this in the mainSummary.
+- Keep the mainSummary concise (under 150 words).
+- Only include sections and keyFindings that are relevant to the query.
+- When analyzing time spent, calculate totals based on the Duration field.
+- Use markdown formatting in section content for better readability.
+
+The JSON Schema for your response is:
+${JSON.stringify(schema, null, 2)}
 
 User Query: "${query}"
 
 Context from Journal Entries:
 ${activityContext}
 
-Your Summary:
-`;
+Your structured JSON response:`;
 }
 
 /**
  * Uses an LLM to generate a natural language summary based on a query and retrieved activities.
  * @param query The original user query.
  * @param activities The list of activities retrieved from the database.
- * @returns A promise that resolves to the AI-generated summary string.
+ * @returns A promise that resolves to the AI-generated summary object.
  */
-export async function generateSummary(query: string, activities: Activity[]): Promise<string> {
+export async function generateSummary(query: string, activities: Activity[]): Promise<z.infer<typeof SummarySchema>> {
     if (activities.length === 0) {
-        return "I couldn't find any activities related to your query. Please try different search terms.";
+        return {
+            mainSummary: "I couldn't find any activities related to your query. Please try different search terms.",
+        };
     }
 
-    const prompt = createSynthesizerPrompt(query, activities);
+    // Convert the Zod schema to JSON schema for the LLM
+    const schema = z.toJSONSchema(SummarySchema);
+    const prompt = createStructuredSynthesizerPrompt(query, activities, schema);
     
     try {
-        console.log('[SearchAgent] Generating summary...');
+        console.log('[SearchAgent] Generating structured summary...');
         const completion = await Promise.race([
             openai.chat.completions.create({
                 model: LLM_MODEL,
                 messages: [{ role: 'user', content: prompt }],
                 temperature: 0.2,
+                response_format: {
+                    type: "json_schema",
+                    json_schema: {
+                        name: 'journal_summary',
+                        schema: schema,
+                        strict: true,
+                    },
+                },
             }),
             new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('LLM summary request timed out after 45 seconds')), 45000)
+                setTimeout(() => reject(new Error('LLM summary request timed out after 180 seconds')), 180000)
             )
         ]) as OpenAI.Chat.Completions.ChatCompletion;
 
-        const summary = completion.choices[0].message.content;
-        if (!summary) {
+        const content = completion.choices[0].message.content;
+        if (!content) {
             throw new Error('LLM returned an empty summary.');
         }
         
-        console.log('[SearchAgent] Generated summary received.');
-        return summary;
+        console.log('[SearchAgent] Raw structured summary received.');
+        
+        // Parse and validate the LLM's response
+        const parsedData = JSON.parse(content);
+        const validationResult = SummarySchema.safeParse(parsedData);
+        
+        if (!validationResult.success) {
+            console.error('[SearchAgent] LLM response failed Zod validation:', validationResult.error);
+            throw new Error('LLM response did not match expected schema.');
+        }
+        
+        return validationResult.data;
 
     } catch (error) {
         console.error('[SearchAgent] Error generating summary:', error);
-        return "I encountered an error while trying to summarize the results. Please try again.";
+        return {
+            mainSummary: "I encountered an error while trying to summarize the results. Please try again."
+        };
     }
 }
