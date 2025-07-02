@@ -38,3 +38,29 @@ model Tag {
   name       String     @unique
   activities Activity[]
 }
+
+enum ReportType {
+  WEEKLY
+  MONTHLY
+}
+
+// New Enum for Report Generation Status
+enum ReportStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// New Model to store generated reports
+model Report {
+  id        String       @id @default(cuid())
+  type      ReportType
+  status    ReportStatus @default(PENDING)
+  startDate DateTime
+  endDate   DateTime
+  content   Json? // The structured JSON output from the LLM
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([type, startDate]) // Ensure only one report of a given type starts on a specific day
+}

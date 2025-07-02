@@ -19,7 +19,8 @@ export default function Home() {
         </div>
 
         {/* Action Cards */}
-        <div className="grid md:grid-cols-3 gap-8 mb-16">
+        <div className="grid md:grid-cols-2 gap-8 mb-16">
+          {/* New Entry Card */}
           <Link href="/journal/new" className="group">
             <div className="tech-card p-8 h-full hover:border-blue-300 group-hover:-translate-y-1 transition-all duration-300">
               <div className="flex items-start gap-4">
@@ -34,6 +35,7 @@ export default function Home() {
             </div>
           </Link>
 
+          {/* View Entries Card */}
           <Link href="/journal/view" className="group">
             <div className="tech-card p-8 h-full hover:border-emerald-300 group-hover:-translate-y-1 transition-all duration-300">
               <div className="flex items-start gap-4">
@@ -48,6 +50,7 @@ export default function Home() {
             </div>
           </Link>
 
+          {/* AI Search Card */}
           <Link href="/search" className="group">
             <div className="tech-card p-8 h-full hover:border-amber-300 group-hover:-translate-y-1 transition-all duration-300">
               <div className="flex items-start gap-4">
@@ -59,6 +62,23 @@ export default function Home() {
                 <div>
                   <h3 className="text-xl font-semibold text-slate-900 mb-2">AI Search</h3>
                   <p className="text-slate-600">Ask questions and get summaries.</p>
+                </div>
+              </div>
+            </div>
+          </Link>
+
+           {/* AI Reports Card */}
+          <Link href="/reports" className="group">
+            <div className="tech-card p-8 h-full hover:border-purple-300 group-hover:-translate-y-1 transition-all duration-300">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900 mb-2">AI Reports</h3>
+                  <p className="text-slate-600">Get weekly summaries and trend analysis.</p>
                 </div>
               </div>
             </div>
