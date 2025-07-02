@@ -23,8 +23,24 @@ interface Activity {
     tags: Tag[];
 }
 
+interface SummarySection {
+    title: string;
+    content: string;
+}
+
+interface TimeSpent {
+    totalMinutes?: number;
+    breakdown?: string;
+}
+
+interface Summary {
+    mainSummary: string;
+    sections?: SummarySection[];
+    timeSpent?: TimeSpent;
+}
+
 interface SearchResult {
-    summary: string;
+    summary: Summary;
     activities: Activity[];
     keywords: string[];
 }
@@ -46,6 +62,39 @@ const LoadingSpinner = () => (
         </div>
     </div>
 );
+
+const SummaryRenderer = ({ summary }: { summary: Summary }) => {
+    return (
+        <div className="prose prose-slate max-w-none">
+            <ReactMarkdown>{summary.mainSummary}</ReactMarkdown>
+            
+            {summary.sections && summary.sections.length > 0 && (
+                summary.sections.map((section, index) => (
+                    <div key={index} className="mt-4">
+                        <h2>{section.title}</h2>
+                        <ReactMarkdown>{section.content}</ReactMarkdown>
+                    </div>
+                ))
+            )}
+
+            {summary.timeSpent && (
+                <div className="mt-4">
+                    <h2>Time Analysis</h2>
+                    {summary.timeSpent.totalMinutes !== undefined && (
+                        <p>
+                            <strong>Total Time:</strong>{' '}
+                            {Math.floor(summary.timeSpent.totalMinutes / 60)}h{' '}
+                            {summary.timeSpent.totalMinutes % 60}m
+                        </p>
+                    )}
+                    {summary.timeSpent.breakdown && (
+                        <ReactMarkdown>{summary.timeSpent.breakdown}</ReactMarkdown>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
 
 const SearchPage = () => {
     const [query, setQuery] = useState('');
@@ -140,9 +189,7 @@ const SearchPage = () => {
                             {/* AI Summary */}
                             <div className="tech-card p-6">
                                 <h2 className="text-xl font-semibold text-slate-900 mb-4">AI Summary</h2>
-                                <div className="prose prose-slate max-w-none">
-                                    <ReactMarkdown>{result.summary}</ReactMarkdown>
-                                </div>
+                                <SummaryRenderer summary={result.summary} />
                                 <div className="mt-4 pt-4 border-t border-slate-200">
                                      <p className="text-sm text-slate-500">
                                         <strong>Keywords used:</strong> {result.keywords.join(', ')}

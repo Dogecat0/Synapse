@@ -30,7 +30,7 @@ const SummarySchema = z.object({
         totalMinutes: z.number().optional().describe("The total time spent on this topic in minutes, if calculable from the entries"),
         breakdown: z.string().optional().describe("A brief breakdown of how time was spent across different activities")
     }).optional().describe("Information about time allocation, if relevant to the query")
-}).required();
+});
 
 // --- Helper Types ---
 interface Activity {
@@ -254,45 +254,16 @@ Your structured JSON response:`;
 }
 
 /**
- * Formats the structured summary into a cohesive markdown string for display.
- * @param summaryData The validated structured summary from the LLM.
- * @returns A markdown-formatted string representation of the summary.
- */
-function formatStructuredSummary(summaryData: z.infer<typeof SummarySchema>): string {
-    let formattedSummary = summaryData.mainSummary + "\n\n";
-    
-    // Add sections if present
-    if (summaryData.sections && summaryData.sections.length > 0) {
-        summaryData.sections.forEach(section => {
-            formattedSummary += `## ${section.title}\n${section.content}\n\n`;
-        });
-    }
-    
-    // Add time spent information if present
-    if (summaryData.timeSpent) {
-        formattedSummary += "## Time Analysis\n";
-        if (summaryData.timeSpent.totalMinutes !== undefined) {
-            const hours = Math.floor(summaryData.timeSpent.totalMinutes / 60);
-            const minutes = summaryData.timeSpent.totalMinutes % 60;
-            formattedSummary += `**Total Time:** ${hours > 0 ? `${hours}h ` : ''}${minutes > 0 ? `${minutes}m` : ''}\n\n`;
-        }
-        if (summaryData.timeSpent.breakdown) {
-            formattedSummary += summaryData.timeSpent.breakdown + "\n\n";
-        }
-    }
-    
-    return formattedSummary.trim();
-}
-
-/**
  * Uses an LLM to generate a natural language summary based on a query and retrieved activities.
  * @param query The original user query.
  * @param activities The list of activities retrieved from the database.
- * @returns A promise that resolves to the AI-generated summary string.
+ * @returns A promise that resolves to the AI-generated summary object.
  */
-export async function generateSummary(query: string, activities: Activity[]): Promise<string> {
+export async function generateSummary(query: string, activities: Activity[]): Promise<z.infer<typeof SummarySchema>> {
     if (activities.length === 0) {
-        return "I couldn't find any activities related to your query. Please try different search terms.";
+        return {
+            mainSummary: "I couldn't find any activities related to your query. Please try different search terms.",
+        };
     }
 
     // Convert the Zod schema to JSON schema for the LLM
@@ -316,7 +287,7 @@ export async function generateSummary(query: string, activities: Activity[]): Pr
                 },
             }),
             new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('LLM summary request timed out after 90 seconds')), 90000)
+                setTimeout(() => reject(new Error('LLM summary request timed out after 180 seconds')), 180000)
             )
         ]) as OpenAI.Chat.Completions.ChatCompletion;
 
@@ -336,12 +307,12 @@ export async function generateSummary(query: string, activities: Activity[]): Pr
             throw new Error('LLM response did not match expected schema.');
         }
         
-        // Format the structured data into a cohesive markdown string
-        const formattedSummary = formatStructuredSummary(validationResult.data);
-        return formattedSummary;
+        return validationResult.data;
 
     } catch (error) {
         console.error('[SearchAgent] Error generating summary:', error);
-        return "I encountered an error while trying to summarize the results. Please try again.";
+        return {
+            mainSummary: "I encountered an error while trying to summarize the results. Please try again."
+        };
     }
 }
