@@ -11,6 +11,7 @@ The application is built with Next.js, TypeScript, and Prisma, and it uses a loc
 - **LLM-Powered Data Import**: An import script uses an LLM to parse plain text journal entries, extract structured data, and populate the database.
 - **Web Interface**: A clean, user-friendly interface to create, view, edit, and search journal entries.
 - **Agentic Search**: Ask natural language questions about your journal and receive AI-generated summaries based on relevant entries.
+- **AI-Generated Weekly Reports**: Get automated, AI-powered summaries of your weekly activities, time allocation, and key trends.
 - **Data Persistence**: Journal entries are stored in a PostgreSQL database via Prisma ORM.
 
 ## Tech Stack
@@ -86,16 +87,20 @@ The project includes a powerful script to import historical journal entries from
 
 This project aims to evolve into a comprehensive personal analytics platform. Here are the key features planned for future development.
 
-### ✅ Feature 1: LLM-Powered Semantic Search and Progress Synthesis [Under Development]
+### ✅ Feature 1: LLM-Powered Semantic Search and Synthesis [Completed]
 
-A standard keyword search is limited. We have implemented a feature where a user can ask a natural language question like, "Show me my progress on the API refactor." This is powered by an agentic RAG (Retrieval-Augmented Generation) pipeline.
+A standard keyword search is limited. This feature allows a user to ask a natural language question like, "Show me my progress on the API refactor." This is powered by an agentic RAG (Retrieval-Augmented Generation) pipeline.
 
 - **Agentic Query Planning**: The user's query is first sent to an LLM "planner" agent that generates a set of relevant keywords for database searching.
 - **Retrieval**: The generated keywords are used to perform a full-text search across all journal entries, finding a broad set of candidate activities.
 - **Agentic Re-ranking**: The candidate activities are then passed to an LLM "re-ranker" agent. This agent analyzes the relevance of each activity to the original query and sorts them, ensuring only the most pertinent information is used for the final summary.
 - **AI-Generated Summaries**: The top-ranked, most relevant entries are then fed to an LLM "synthesizer" agent to generate a concise, markdown-formatted summary of the progress, blockers, and time spent on that topic.
 
-### 🎤 Feature 2: Voice-to-Data Pipeline for Hands-Free Entry
+### ✅ Feature 2: Automated Weekly Reporting [Completed]
+
+To provide regular insights with minimal effort, the application can now generate automated weekly reports. These reports summarize time allocation between work and life, highlight key activities, analyze tag usage, and provide AI-driven insights into trends and patterns for the week. This feature is the first step towards a broader analytics and reporting dashboard.
+
+### 🎤 Feature 3: Voice-to-Data Pipeline for Hands-Free Entry
 
 Typing is a point of friction. The next major UX improvement will be voice input. The plan is to integrate a speech-to-text model (like a self-hosted Whisper instance or a cloud API).
 
@@ -107,6 +112,6 @@ The pipeline will be simple and modular:
 
 This reuses the core backend logic, making it an efficient way to add a powerful new input method.
 
-### 📊 Feature 3: Correlation Analysis and Reporting
+### 📊 Feature 4: Advanced Correlation Analysis and Dashboards
 
-With a growing dataset, we can build dashboards to find correlations. For example, does more time spent on "meetings" impact time allocated to "deep work" or "exercise"? A model could also generate automated weekly reports summarizing time allocation and highlighting trends.
+With a growing dataset, we can build interactive dashboards to find correlations. For example, does more time spent on "meetings" impact time allocated to "deep work" or "exercise"? This feature will expand on the weekly reports to provide visualizations and deeper, queryable analytics over longer time periods.
