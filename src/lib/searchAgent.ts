@@ -38,7 +38,7 @@ interface Activity {
     description: string;
     duration: number | null;
     notes: string | null;
-    category: string;
+    category: 'PROFESSIONAL' | 'PROJECT' | 'LIFE';
     journalEntry: {
         date: Date;
     };

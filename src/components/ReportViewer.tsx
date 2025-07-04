@@ -10,7 +10,8 @@ interface ReportViewerProps {
 const ReportViewer: React.FC<ReportViewerProps> = ({ reportContent }) => {
 
     const { title, summary, timeAnalysis, keyActivities, tagAnalysis, insightsAndTrends } = reportContent;
-    const workPercent = timeAnalysis.totalMinutes > 0 ? (timeAnalysis.workMinutes / timeAnalysis.totalMinutes) * 100 : 0;
+    const professionalPercent = timeAnalysis.totalMinutes > 0 ? (timeAnalysis.professionalMinutes / timeAnalysis.totalMinutes) * 100 : 0;
+    const projectPercent = timeAnalysis.totalMinutes > 0 ? (timeAnalysis.projectMinutes / timeAnalysis.totalMinutes) * 100 : 0;
 
     return (
         <div className="tech-card p-6 md:p-8 space-y-8 animate-fade-in">
@@ -33,8 +34,12 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportContent }) => {
                         <div className="text-sm text-slate-500">Total Time</div>
                     </div>
                     <div className="bg-blue-50 p-4 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-800">{Math.floor(timeAnalysis.workMinutes / 60)}h {timeAnalysis.workMinutes % 60}m</div>
-                        <div className="text-sm text-blue-600">Work Time</div>
+                        <div className="text-2xl font-bold text-blue-800">{Math.floor(timeAnalysis.professionalMinutes / 60)}h {timeAnalysis.professionalMinutes % 60}m</div>
+                        <div className="text-sm text-blue-600">Professional Time</div>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                        <div className="text-2xl font-bold text-purple-800">{Math.floor(timeAnalysis.projectMinutes / 60)}h {timeAnalysis.projectMinutes % 60}m</div>
+                        <div className="text-sm text-purple-600">Project Time</div>
                     </div>
                     <div className="bg-emerald-50 p-4 rounded-lg">
                         <div className="text-2xl font-bold text-emerald-800">{Math.floor(timeAnalysis.lifeMinutes / 60)}h {timeAnalysis.lifeMinutes % 60}m</div>
@@ -42,9 +47,10 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportContent }) => {
                     </div>
                 </div>
                 <div className="mt-4">
-                    <div className="text-sm font-medium text-slate-600 mb-2 text-center">{timeAnalysis.workLifeRatio}</div>
-                    <div className="w-full bg-emerald-200 rounded-full h-2.5">
-                        <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${workPercent}%` }}></div>
+                    <div className="text-sm font-medium text-slate-600 mb-2 text-center">{timeAnalysis.breakdownRatio}</div>
+                    <div className="w-full bg-emerald-200 rounded-full h-2.5 flex">
+                        <div className="bg-blue-500 h-2.5 rounded-l-full" style={{ width: `${professionalPercent}%` }}></div>
+                        <div className="bg-purple-500 h-2.5" style={{ width: `${projectPercent}%` }}></div>
                     </div>
                 </div>
             </section>
@@ -54,7 +60,11 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportContent }) => {
                 <h3 className="text-lg font-semibold text-slate-800 mb-4">Key Activities</h3>
                 <div className="space-y-3">
                     {keyActivities.map((activity, index) => (
-                        <div key={index} className={`p-3 rounded-lg border-l-4 ${activity.category === 'WORK' ? 'bg-blue-50 border-blue-400' : 'bg-emerald-50 border-emerald-400'}`}>
+                        <div key={index} className={`p-3 rounded-lg border-l-4 ${
+                            activity.category === 'PROFESSIONAL' ? 'bg-blue-50 border-blue-400' : 
+                            activity.category === 'PROJECT' ? 'bg-purple-50 border-purple-400' : 
+                            'bg-emerald-50 border-emerald-400'
+                        }`}>
                             <p className="font-medium text-slate-800">{activity.description}</p>
                         </div>
                     ))}

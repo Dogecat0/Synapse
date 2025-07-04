@@ -19,18 +19,25 @@ model JournalEntry {
 }
 
 model Activity {
-  id          String   @id @default(cuid())
+  id          String           @id @default(cuid())
   description String
   duration    Int? // Duration in minutes
   notes       String?
-  category    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  category    ActivityCategory
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id])
   journalEntryId String
 
   tags Tag[]
+}
+
+// Add the new enum
+enum ActivityCategory {
+  PROFESSIONAL // 9-5 work
+  PROJECT // side project, personal work
+  LIFE // personal activities
 }
 
 model Tag {

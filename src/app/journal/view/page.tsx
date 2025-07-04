@@ -164,7 +164,11 @@ export default function ViewJournalEntries() {
                                             <div className="flex items-center gap-4">
                                                 <div className="flex items-center gap-2 text-sm text-slate-600">
                                                     <div className="status-work"></div>
-                                                    <span>{selectedEntry.activities.filter(a => a.category === 'WORK').length} work</span>
+                                                    <span>{selectedEntry.activities.filter(a => a.category === 'PROFESSIONAL').length} professional</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                                    <div className="status-indicator bg-purple-500"></div>
+                                                    <span>{selectedEntry.activities.filter(a => a.category === 'PROJECT').length} project</span>
                                                 </div>
                                                 <div className="flex items-center gap-2 text-sm text-slate-600">
                                                     <div className="status-life"></div>
@@ -183,18 +187,18 @@ export default function ViewJournalEntries() {
                                         </div>
                                     </div>
 
-                                    {/* Work Activities */}
+                                    {/* Professional Activities */}
                                     <div className="tech-card p-6">
                                         <div className="flex items-center gap-3 mb-6">
                                             <div className="status-work"></div>
-                                            <h3 className="text-xl font-semibold text-slate-900">Work Activities</h3>
+                                            <h3 className="text-xl font-semibold text-slate-900">Professional Activities</h3>
                                         </div>
-                                        {selectedEntry.activities.filter(a => a.category === 'WORK').length === 0 ? (
-                                            <p className="text-slate-500 italic">No work activities recorded</p>
+                                        {selectedEntry.activities.filter(a => a.category === 'PROFESSIONAL').length === 0 ? (
+                                            <p className="text-slate-500 italic">No professional activities recorded</p>
                                         ) : (
                                             <div className="space-y-4">
                                                 {selectedEntry.activities
-                                                    .filter(activity => activity.category === 'WORK')
+                                                    .filter(activity => activity.category === 'PROFESSIONAL')
                                                     .map(activity => (
                                                         <div key={activity.id} className="activity-item border-l-4 border-blue-500">
                                                             <div className="flex items-start justify-between mb-2">
@@ -212,6 +216,46 @@ export default function ViewJournalEntries() {
                                                                 <div className="flex flex-wrap gap-2">
                                                                     {activity.tags.map(tag => (
                                                                         <span key={tag.id} className="tech-badge-blue">
+                                                                            #{tag.name}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Project Activities */}
+                                    <div className="tech-card p-6">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="status-indicator bg-purple-500"></div>
+                                            <h3 className="text-xl font-semibold text-slate-900">Project Activities</h3>
+                                        </div>
+                                        {selectedEntry.activities.filter(a => a.category === 'PROJECT').length === 0 ? (
+                                            <p className="text-slate-500 italic">No project activities recorded</p>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {selectedEntry.activities
+                                                    .filter(activity => activity.category === 'PROJECT')
+                                                    .map(activity => (
+                                                        <div key={activity.id} className="activity-item border-l-4 border-purple-500">
+                                                            <div className="flex items-start justify-between mb-2">
+                                                                <h4 className="font-semibold text-slate-900">{activity.description}</h4>
+                                                                {activity.duration && (
+                                                                    <div className="tech-badge bg-purple-100 text-purple-800">
+                                                                        {activity.duration}m
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {activity.notes && (
+                                                                <p className="text-slate-700 mb-3">{activity.notes}</p>
+                                                            )}
+                                                            {Array.isArray(activity.tags) && activity.tags.length > 0 && (
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {activity.tags.map(tag => (
+                                                                        <span key={tag.id} className="tech-badge bg-purple-100 text-purple-800">
                                                                             #{tag.name}
                                                                         </span>
                                                                     ))}

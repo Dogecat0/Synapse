@@ -14,9 +14,9 @@ const openai = new OpenAI({
 // --- Type Definitions ---
 type ActivityForReport = {
     description: string;
-    duration: number;
-    notes: string;
-    category: string;
+    duration: number | null;
+    notes: string | null;
+    category: 'PROFESSIONAL' | 'PROJECT' | 'LIFE';
     journalEntry: { date: Date };
     tags: { name: string }[];
 };
@@ -27,12 +27,13 @@ export const WeeklyReportSchema = z.object({
   summary: z.string().describe("A 3-4 sentence narrative summary of the week's key activities, achievements, and work-life balance."),
   timeAnalysis: z.object({
     totalMinutes: z.number(),
-    workMinutes: z.number(),
+    professionalMinutes: z.number(),
+    projectMinutes: z.number(),
     lifeMinutes: z.number(),
-    workLifeRatio: z.string().describe("e.g., '60% Work / 40% Life'"),
+    breakdownRatio: z.string().describe("e.g., '50% Professional / 20% Project / 30% Life'"),
   }).describe("Breakdown of time allocation."),
   keyActivities: z.array(z.object({
-    category: z.enum(['WORK', 'LIFE']),
+    category: z.enum(['PROFESSIONAL', 'PROJECT', 'LIFE']),
     description: z.string(),
     timeSpent: z.number().optional()
   })).min(3).max(5).describe("List of 3-5 most significant activities or accomplishments."),

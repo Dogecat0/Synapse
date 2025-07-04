@@ -9,7 +9,8 @@ function NewJournalEntryContent() {
   const searchParams = useSearchParams();
   const entryDate = searchParams.get('date');
   const [date, setDate] = useState(entryDate || new Date().toISOString().slice(0, 10));
-  const [workActivities, setWorkActivities] = useState([{ description: '', duration: '', notes: '', tags: '' }]);
+  const [professionalActivities, setProfessionalActivities] = useState([{ description: '', duration: '', notes: '', tags: '' }]);
+  const [projectActivities, setProjectActivities] = useState([{ description: '', duration: '', notes: '', tags: '' }]);
   const [lifeActivities, setLifeActivities] = useState([{ description: '', duration: '', notes: '', tags: '' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -17,58 +18,47 @@ function NewJournalEntryContent() {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleWorkActivityChange = (index, field, value) => {
+  const handleActivityChange = (activitiesGetter, activitiesSetter, index, field, value) => {
     // Validation for duration field - allow only numbers
     if (field === 'duration' && value && !/^\d*$/.test(value)) {
       return;
     }
-
-    const updatedActivities = [...workActivities];
+    const updatedActivities = [...activitiesGetter()];
     updatedActivities[index][field] = value;
-    setWorkActivities(updatedActivities);
+    activitiesSetter(updatedActivities);
   };
 
-  const handleLifeActivityChange = (index, field, value) => {
-    // Validation for duration field - allow only numbers
-    if (field === 'duration' && value && !/^\d*$/.test(value)) {
-      return;
-    }
-
-    const updatedActivities = [...lifeActivities];
-    updatedActivities[index][field] = value;
-    setLifeActivities(updatedActivities);
+  const handleAddActivity = (setter) => {
+    setter(prev => [...prev, { description: '', duration: '', notes: '', tags: '' }]);
   };
 
-  const handleAddActivity = (category) => {
-    if (category === 'work') {
-      setWorkActivities([...workActivities, { description: '', duration: '', notes: '', tags: '' }]);
-    } else {
-      setLifeActivities([...lifeActivities, { description: '', duration: '', notes: '', tags: '' }]);
-    }
-  };
-
-  const handleRemoveActivity = (category, index) => {
-    if (category === 'work') {
-      const updatedActivities = workActivities.filter((_, i) => i !== index);
-      setWorkActivities(updatedActivities);
-    } else {
-      const updatedActivities = lifeActivities.filter((_, i) => i !== index);
-      setLifeActivities(updatedActivities);
-    }
+  const handleRemoveActivity = (setter, index) => {
+    setter(prev => prev.filter((_, i) => i !== index));
   };
 
   // Function to fetch an existing entry when the date changes
   const checkExistingEntry = async (selectedDate) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/journal?date=${selectedDate}`);
+      const response = await fetch(`/api/journal`); // Fetch all entries
       if (response.ok) {
-        const data = await response.json();
+        const allEntries = await response.json();
+        
+        // Find the entry for the selected date
+        const data = allEntries.find(entry => entry.date.startsWith(selectedDate));
 
         if (data && data.id) {
           // Found an existing entry, populate the form
-          const work = data.activities
-            .filter(a => a.category === 'WORK')
+          const professional = data.activities
+            .filter(a => a.category === 'PROFESSIONAL')
+            .map(a => ({
+              description: a.description,
+              duration: a.duration?.toString() ?? '',
+              notes: a.notes ?? '',
+              tags: a.tags.map(t => t.name).join(', '),
+            }));
+          const project = data.activities
+            .filter(a => a.category === 'PROJECT')
             .map(a => ({
               description: a.description,
               duration: a.duration?.toString() ?? '',
@@ -84,13 +74,15 @@ function NewJournalEntryContent() {
               tags: a.tags.map(t => t.name).join(', '),
             }));
 
-          setWorkActivities(work.length > 0 ? work : [{ description: '', duration: '', notes: '', tags: '' }]);
+          setProfessionalActivities(professional.length > 0 ? professional : [{ description: '', duration: '', notes: '', tags: '' }]);
+          setProjectActivities(project.length > 0 ? project : [{ description: '', duration: '', notes: '', tags: '' }]);
           setLifeActivities(life.length > 0 ? life : [{ description: '', duration: '', notes: '', tags: '' }]);
 
           setIsEditing(true);
         } else {
           // No existing entry, reset form
-          setWorkActivities([{ description: '', duration: '', notes: '', tags: '' }]);
+          setProfessionalActivities([{ description: '', duration: '', notes: '', tags: '' }]);
+          setProjectActivities([{ description: '', duration: '', notes: '', tags: '' }]);
           setLifeActivities([{ description: '', duration: '', notes: '', tags: '' }]);
           setIsEditing(false);
         }
@@ -117,29 +109,22 @@ function NewJournalEntryContent() {
   const validateForm = () => {
     const newErrors: Record<string, string[]> = {};
 
-    // Validate work activities
-    workActivities.forEach((activity, index) => {
-      if (!activity.description.trim()) {
-        if (!newErrors.work) newErrors.work = [];
-        newErrors.work.push(`Work activity #${index + 1} requires a description`);
-      }
-      if (activity.duration && !/^\d+$/.test(activity.duration)) {
-        if (!newErrors.work) newErrors.work = [];
-        newErrors.work.push(`Work activity #${index + 1} duration must be a number`);
-      }
-    });
+    const validateCategory = (activities, categoryName) => {
+      activities.forEach((activity, index) => {
+        if (!activity.description.trim() && (activities.length > 1 || Object.values(activity).some(v => v !== ''))) {
+          if (!newErrors[categoryName]) newErrors[categoryName] = [];
+          newErrors[categoryName].push(`${categoryName} activity #${index + 1} requires a description`);
+        }
+        if (activity.duration && !/^\d+$/.test(activity.duration)) {
+          if (!newErrors[categoryName]) newErrors[categoryName] = [];
+          newErrors[categoryName].push(`${categoryName} activity #${index + 1} duration must be a number`);
+        }
+      });
+    };
 
-    // Validate life activities
-    lifeActivities.forEach((activity, index) => {
-      if (!activity.description.trim()) {
-        if (!newErrors.life) newErrors.life = [];
-        newErrors.life.push(`Life activity #${index + 1} requires a description`);
-      }
-      if (activity.duration && !/^\d+$/.test(activity.duration)) {
-        if (!newErrors.life) newErrors.life = [];
-        newErrors.life.push(`Life activity #${index + 1} duration must be a number`);
-      }
-    });
+    validateCategory(professionalActivities, 'Professional');
+    validateCategory(projectActivities, 'Project');
+    validateCategory(lifeActivities, 'Life');
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -155,15 +140,14 @@ function NewJournalEntryContent() {
     setIsSubmitting(true);
     setErrors({});
 
-    // Basic validation
-    const hasEmptyWorkDescription = workActivities.some(activity => !activity.description.trim());
-    const hasEmptyLifeDescription = lifeActivities.some(activity => !activity.description.trim());
+    const allActivities = [
+      ...professionalActivities.filter(a => a.description.trim()).map(a => ({ ...a, category: 'PROFESSIONAL' })),
+      ...projectActivities.filter(a => a.description.trim()).map(a => ({ ...a, category: 'PROJECT' })),
+      ...lifeActivities.filter(a => a.description.trim()).map(a => ({ ...a, category: 'LIFE' })),
+    ];
 
-    if (hasEmptyWorkDescription || hasEmptyLifeDescription) {
-      setErrors({
-        work: hasEmptyWorkDescription ? ['Please fill in all work activity descriptions'] : [],
-        life: hasEmptyLifeDescription ? ['Please fill in all life activity descriptions'] : [],
-      });
+    if (allActivities.length === 0) {
+      setErrors({ form: ['Please add at least one activity.'] });
       setIsSubmitting(false);
       return;
     }
@@ -174,7 +158,7 @@ function NewJournalEntryContent() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ date, workActivities, lifeActivities, force: isEditing || force }),
+        body: JSON.stringify({ date, activities: allActivities, force: isEditing || force }),
       });
 
       setIsSubmitting(false);
@@ -288,22 +272,22 @@ function NewJournalEntryContent() {
               )}
             </div>
 
-            {/* Work Activities Section */}
+            {/* Professional Activities Section */}
             <div className="activity-section">
               <div className="flex items-center gap-3 mb-6">
                 <div className="status-work"></div>
-                <h2 className="text-xl font-semibold text-slate-900">Work Activities</h2>
-                <div className="tech-badge-blue">{workActivities.length} activities</div>
+                <h2 className="text-xl font-semibold text-slate-900">Professional Activities</h2>
+                <div className="tech-badge-blue">{professionalActivities.filter(a => a.description.trim()).length} activities</div>
               </div>
 
               <div className="space-y-4">
-                {workActivities.map((activity, index) => (
+                {professionalActivities.map((activity, index) => (
                   <div key={index} className="activity-item relative">
                     <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-200">
                       <div className="font-medium text-slate-700">Activity #{index + 1}</div>
                       <button
                         type="button"
-                        onClick={() => handleRemoveActivity('work', index)}
+                        onClick={() => handleRemoveActivity(setProfessionalActivities, index)}
                         className="flex items-center px-2 py-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"
                         title="Remove activity"
                       >
@@ -318,7 +302,7 @@ function NewJournalEntryContent() {
                         type="text"
                         placeholder="What did you work on?"
                         value={activity.description}
-                        onChange={(e) => handleWorkActivityChange(index, 'description', e.target.value)}
+                        onChange={(e) => handleActivityChange(() => professionalActivities, setProfessionalActivities, index, 'description', e.target.value)}
                         className="tech-input"
                       />
                       <div className="grid md:grid-cols-2 gap-4">
@@ -326,21 +310,21 @@ function NewJournalEntryContent() {
                           type="text"
                           placeholder="Duration (minutes)"
                           value={activity.duration}
-                          onChange={(e) => handleWorkActivityChange(index, 'duration', e.target.value)}
+                          onChange={(e) => handleActivityChange(() => professionalActivities, setProfessionalActivities, index, 'duration', e.target.value)}
                           className="tech-input"
                         />
                         <input
                           type="text"
                           placeholder="Tags (comma-separated)"
                           value={activity.tags}
-                          onChange={(e) => handleWorkActivityChange(index, 'tags', e.target.value)}
+                          onChange={(e) => handleActivityChange(() => professionalActivities, setProfessionalActivities, index, 'tags', e.target.value)}
                           className="tech-input"
                         />
                       </div>
                       <textarea
                         placeholder="Additional notes or details..."
                         value={activity.notes}
-                        onChange={(e) => handleWorkActivityChange(index, 'notes', e.target.value)}
+                        onChange={(e) => handleActivityChange(() => professionalActivities, setProfessionalActivities, index, 'notes', e.target.value)}
                         className="tech-textarea"
                         rows={3}
                       />
@@ -351,13 +335,86 @@ function NewJournalEntryContent() {
 
               <button
                 type="button"
-                onClick={() => handleAddActivity('work')}
+                onClick={() => handleAddActivity(setProfessionalActivities)}
                 className="tech-button-primary flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                Add Work Activity
+                Add Professional Activity
+              </button>
+            </div>
+
+            {/* Project Activities Section */}
+            <div className="activity-section">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="status-indicator bg-purple-500"></div>
+                <h2 className="text-xl font-semibold text-slate-900">Project Activities</h2>
+                <div className="tech-badge bg-purple-100 text-purple-800">{projectActivities.filter(a => a.description.trim()).length} activities</div>
+              </div>
+
+              <div className="space-y-4">
+                {projectActivities.map((activity, index) => (
+                  <div key={index} className="activity-item relative">
+                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-200">
+                      <div className="font-medium text-slate-700">Activity #{index + 1}</div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveActivity(setProjectActivities, index)}
+                        className="flex items-center px-2 py-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        title="Remove activity"
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Remove
+                      </button>
+                    </div>
+                    <div className="grid gap-4">
+                      <input
+                        type="text"
+                        placeholder="What project activity did you do?"
+                        value={activity.description}
+                        onChange={(e) => handleActivityChange(() => projectActivities, setProjectActivities, index, 'description', e.target.value)}
+                        className="tech-input"
+                      />
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <input
+                          type="text"
+                          placeholder="Duration (minutes)"
+                          value={activity.duration}
+                          onChange={(e) => handleActivityChange(() => projectActivities, setProjectActivities, index, 'duration', e.target.value)}
+                          className="tech-input"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Tags (comma-separated)"
+                          value={activity.tags}
+                          onChange={(e) => handleActivityChange(() => projectActivities, setProjectActivities, index, 'tags', e.target.value)}
+                          className="tech-input"
+                        />
+                      </div>
+                      <textarea
+                        placeholder="Additional notes or details..."
+                        value={activity.notes}
+                        onChange={(e) => handleActivityChange(() => projectActivities, setProjectActivities, index, 'notes', e.target.value)}
+                        className="tech-textarea"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleAddActivity(setProjectActivities)}
+                className="tech-button-primary flex items-center gap-2 bg-purple-600 hover:bg-purple-700 focus:ring-purple-200"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Project Activity
               </button>
             </div>
 
@@ -366,7 +423,7 @@ function NewJournalEntryContent() {
               <div className="flex items-center gap-3 mb-6">
                 <div className="status-life"></div>
                 <h2 className="text-xl font-semibold text-slate-900">Life Activities</h2>
-                <div className="tech-badge-green">{lifeActivities.length} activities</div>
+                <div className="tech-badge-green">{lifeActivities.filter(a => a.description.trim()).length} activities</div>
               </div>
 
               <div className="space-y-4">
@@ -376,7 +433,7 @@ function NewJournalEntryContent() {
                       <div className="font-medium text-slate-700">Activity #{index + 1}</div>
                       <button
                         type="button"
-                        onClick={() => handleRemoveActivity('life', index)}
+                        onClick={() => handleRemoveActivity(setLifeActivities, index)}
                         className="flex items-center px-2 py-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"
                         title="Remove activity"
                       >
@@ -391,7 +448,7 @@ function NewJournalEntryContent() {
                         type="text"
                         placeholder="What life activity did you do?"
                         value={activity.description}
-                        onChange={(e) => handleLifeActivityChange(index, 'description', e.target.value)}
+                        onChange={(e) => handleActivityChange(() => lifeActivities, setLifeActivities, index, 'description', e.target.value)}
                         className="tech-input"
                       />
                       <div className="grid md:grid-cols-2 gap-4">
@@ -399,21 +456,21 @@ function NewJournalEntryContent() {
                           type="text"
                           placeholder="Duration (minutes)"
                           value={activity.duration}
-                          onChange={(e) => handleLifeActivityChange(index, 'duration', e.target.value)}
+                          onChange={(e) => handleActivityChange(() => lifeActivities, setLifeActivities, index, 'duration', e.target.value)}
                           className="tech-input"
                         />
                         <input
                           type="text"
                           placeholder="Tags (comma-separated)"
                           value={activity.tags}
-                          onChange={(e) => handleLifeActivityChange(index, 'tags', e.target.value)}
+                          onChange={(e) => handleActivityChange(() => lifeActivities, setLifeActivities, index, 'tags', e.target.value)}
                           className="tech-input"
                         />
                       </div>
                       <textarea
                         placeholder="Additional notes or details..."
                         value={activity.notes}
-                        onChange={(e) => handleLifeActivityChange(index, 'notes', e.target.value)}
+                        onChange={(e) => handleActivityChange(() => lifeActivities, setLifeActivities, index, 'notes', e.target.value)}
                         className="tech-textarea"
                         rows={3}
                       />
@@ -424,7 +481,7 @@ function NewJournalEntryContent() {
 
               <button
                 type="button"
-                onClick={() => handleAddActivity('life')}
+                onClick={() => handleAddActivity(setLifeActivities)}
                 className="tech-button-primary flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-200"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
