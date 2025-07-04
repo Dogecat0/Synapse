@@ -1,15 +1,6 @@
 import { OpenAI } from 'openai';
 import * as z from 'zod/v4';
-import { Prisma } from '@prisma/client';
-
-// --- LLM Configuration ---
-const LLM_API_URL = 'http://localhost:11434/v1/';
-const LLM_MODEL = 'gemma3n:latest';
-
-const openai = new OpenAI({
-    baseURL: LLM_API_URL,
-    apiKey: 'ollama', // Required but not used for local Ollama
-});
+import { LLM_MODEL, openai } from './llmConfig';
 
 // --- Type Definitions ---
 type ActivityForReport = {
