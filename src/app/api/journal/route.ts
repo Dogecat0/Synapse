@@ -58,6 +58,71 @@ export async function POST(request: Request) {
       });
     }
 
+    // First, collect all unique tag names from all activities
+    const allTagNames = new Set<string>();
+    activities.forEach(activity => {
+      const { tags } = activity;
+      if (tags) {
+        tags.split(',').map(t => t.trim()).filter(Boolean).forEach(tag => allTagNames.add(tag));
+      }
+    });
+
+    // Pre-create or fetch all tags to avoid parallel creation conflicts
+    const tagMap = new Map();
+    await Promise.all(
+      Array.from(allTagNames).map(async (name) => {
+        try {
+          const tag = await prisma.tag.upsert({
+            where: { name },
+            update: {}, // No update needed
+            create: { name },
+          });
+          tagMap.set(name, tag);
+        } catch (error) {
+          // If tag already exists, try to fetch it
+          try {
+            const existingTag = await prisma.tag.findUnique({ where: { name } });
+            if (existingTag) tagMap.set(name, existingTag);
+          } catch (fetchError) {
+            console.error(`Failed to handle tag "${name}":`, fetchError);
+          }
+        }
+      })
+    );
+
+    // Create activities and connect them to the journal entry
+    const createdActivities = await Promise.all(
+      activities.map(async (activity) => {
+        const { tags, ...activityData } = activity;
+        const tagNames = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+        
+        // Get tag IDs that we've already created/fetched
+        const tagIds = tagNames
+          .filter(name => tagMap.has(name))
+          .map(name => ({ id: tagMap.get(name).id }));
+
+        return prisma.activity.create({
+          data: {
+            description: activity.description,
+            category: activity.category as ActivityCategory,
+            duration: activity.duration ? parseInt(activity.duration, 10) : null,
+            notes: activityData.notes || null,
+            journalEntry: {
+              connect: { id: journalEntry.id },
+            },
+            tags: {
+              // Just connect to existing tags instead of trying to create them again
+              connect: tagIds,
+            },
+          },
+          include: {
+            tags: true,
+          },
+        });
+      })
+    );
+
+    return NextResponse.json({ ...journalEntry, activities: createdActivities }, { status: 201 });
   } catch (error) {
     console.error('Error creating journal entry:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
