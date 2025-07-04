@@ -1,6 +1,6 @@
 services:
   db:
-    image: pgvector/pgvector:pg16
+    image: postgres:17-alpine
     container_name: synapse-db
     environment:
       - POSTGRES_USER=user
@@ -9,31 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - synapse-data:/var/lib/postgresql/data
-
-  ollama:
-    volumes:
-      - ./data/ollama/data:/root/.ollama
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_MAX_LOADED_MODELS=1
-      - OLLAMA_FLASH_ATTENTION=1
-      - OLLAMA_KV_CACHE_TYPE=Q8_0
-      - OLLAMA_NUM_PARALLEL=1
-      - OLLAMA_KEEP_ALIVE=30m
-    ports:
-      - 11434:11434
-    tty: true
-    restart: unless-stopped
-    image: ollama/ollama:latest
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities:
-                - gpu
+      - synapse-notes:/var/lib/postgresql/data
 
 volumes:
-  synapse-data:
+  synapse-notes:
