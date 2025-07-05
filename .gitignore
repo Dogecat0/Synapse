@@ -63,3 +63,6 @@ repomix-output.xml
 
 # Ignore the local import-journal script
 /scripts/import-journal-local.mjs
+
+# Next.js internal migration lock file
+migration_lock.toml
