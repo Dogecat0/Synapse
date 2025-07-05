@@ -61,8 +61,5 @@ repomix-output.xml
 # Database dumps
 *.sql
 
-# Ignore the local import-journal script
-/scripts/import-journal-local.mjs
-
 # Next.js internal migration lock file
 migration_lock.toml
