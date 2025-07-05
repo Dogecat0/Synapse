@@ -12,7 +12,11 @@ type ActivityForReport = {
     description: string;
     duration: number | null;
     notes: string | null;
-    category: 'PROFESSIONAL' | 'PROJECT' | 'LIFE';
+    category: {
+        id: string;
+        name: string;
+        color: string;
+    };
     journalEntry: { date: Date };
     tags: { name: string }[];
 };
@@ -28,11 +32,11 @@ export const WeeklyReportSchema = z.object({
     lifeMinutes: z.number(),
     breakdownRatio: z.string().describe("e.g., '50% Professional / 20% Project / 30% Life'"),
   }).describe("Breakdown of time allocation."),
-  keyActivities: z.array(z.object({
-    category: z.enum(['PROFESSIONAL', 'PROJECT', 'LIFE']),
+keyActivities: z.array(z.object({
+    categoryName: z.string().describe("The name of the category (e.g., 'Professional', 'Project', 'Life', etc.)"),
     description: z.string(),
     timeSpent: z.number().optional()
-  })).min(3).max(5).describe("List of 3-5 most significant activities or accomplishments."),
+})).min(3).max(5).describe("List of 3-5 most significant activities or accomplishments."),
   tagAnalysis: z.array(z.object({
       tag: z.string(),
       minutes: z.number(),

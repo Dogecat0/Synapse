@@ -100,12 +100,6 @@ export async function POST(request: Request) {
     
     // 5. Update the report with the result
     if (reportContent) {
-        // Quick fix for category names if LLM uses 'WORK' instead of 'PROFESSIONAL'
-        reportContent.keyActivities = reportContent.keyActivities.map(act => ({
-            ...act,
-            category: act.category === ('WORK' as any) ? 'PROFESSIONAL' : act.category,
-        }));
-
         const updatedReport = await prisma.report.update({
             where: { id: report.id },
             data: {

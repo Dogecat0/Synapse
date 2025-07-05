@@ -13,6 +13,23 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportContent }) => {
     const professionalPercent = timeAnalysis.totalMinutes > 0 ? (timeAnalysis.professionalMinutes / timeAnalysis.totalMinutes) * 100 : 0;
     const projectPercent = timeAnalysis.totalMinutes > 0 ? (timeAnalysis.projectMinutes / timeAnalysis.totalMinutes) * 100 : 0;
 
+    // Helper function to get category color based on category name
+    const getCategoryColor = (categoryName: string): { bg: string, border: string, text: string } => {
+        const normalizedName = categoryName.toLowerCase();
+        
+        // Default color mappings - you can extend this based on your category names
+        if (normalizedName.includes('professional') || normalizedName.includes('work')) {
+            return { bg: 'bg-blue-50', border: 'border-blue-400', text: 'text-blue-800' };
+        } else if (normalizedName.includes('project')) {
+            return { bg: 'bg-purple-50', border: 'border-purple-400', text: 'text-purple-800' };
+        } else if (normalizedName.includes('life') || normalizedName.includes('personal')) {
+            return { bg: 'bg-emerald-50', border: 'border-emerald-400', text: 'text-emerald-800' };
+        } else {
+            // Default fallback
+            return { bg: 'bg-slate-50', border: 'border-slate-400', text: 'text-slate-800' };
+        }
+    };
+
     return (
         <div className="tech-card p-6 md:p-8 space-y-8 animate-fade-in">
             {/* Header */}
@@ -59,15 +76,17 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportContent }) => {
             <section>
                 <h3 className="text-lg font-semibold text-slate-800 mb-4">Key Activities</h3>
                 <div className="space-y-3">
-                    {keyActivities.map((activity, index) => (
-                        <div key={index} className={`p-3 rounded-lg border-l-4 ${
-                            activity.category === 'PROFESSIONAL' ? 'bg-blue-50 border-blue-400' : 
-                            activity.category === 'PROJECT' ? 'bg-purple-50 border-purple-400' : 
-                            'bg-emerald-50 border-emerald-400'
-                        }`}>
-                            <p className="font-medium text-slate-800">{activity.description}</p>
-                        </div>
-                    ))}
+                    {keyActivities.map((activity, index) => {
+                        const colors = getCategoryColor(activity.categoryName);
+                        return (
+                            <div key={index} className={`p-3 rounded-lg border-l-4 ${colors.bg} ${colors.border}`}>
+                                <p className={`font-medium ${colors.text}`}>{activity.description}</p>
+                                {activity.timeSpent && (
+                                    <p className="text-sm text-slate-600 mt-1">{activity.timeSpent} minutes</p>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             </section>
 

@@ -1,4 +1,4 @@
-import { PrismaClient, ActivityCategory } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 
@@ -10,7 +10,7 @@ const ActivitySchema = z.object({
   duration: z.string().optional(),
   notes: z.string().nullable().optional(),
   tags: z.string().optional(),
-  category: z.nativeEnum(ActivityCategory),
+  categoryId: z.string().min(1), // Changed from category enum to categoryId
 });
 
 // Zod schema for the entire request body
@@ -56,6 +56,23 @@ export async function POST(request: Request) {
         data: { date: entryDate },
         include: { activities: true },
       });
+    }
+
+    // Validate that all category IDs exist
+    const categoryIds = [...new Set(activities.map(a => a.categoryId))];
+    const existingCategories = await prisma.category.findMany({
+      where: { id: { in: categoryIds } },
+      select: { id: true }
+    });
+    
+    const existingCategoryIds = new Set(existingCategories.map(c => c.id));
+    const invalidCategoryIds = categoryIds.filter(id => !existingCategoryIds.has(id));
+    
+    if (invalidCategoryIds.length > 0) {
+      return NextResponse.json({ 
+        error: 'Invalid category IDs', 
+        invalidCategories: invalidCategoryIds 
+      }, { status: 400 });
     }
 
     // First, collect all unique tag names from all activities
@@ -104,12 +121,10 @@ export async function POST(request: Request) {
         return prisma.activity.create({
           data: {
             description: activity.description,
-            category: activity.category as ActivityCategory,
             duration: activity.duration ? parseInt(activity.duration, 10) : null,
             notes: activityData.notes || null,
-            journalEntry: {
-              connect: { id: journalEntry.id },
-            },
+            journalEntryId: journalEntry.id,
+            categoryId: activity.categoryId,
             tags: {
               // Just connect to existing tags instead of trying to create them again
               connect: tagIds,
@@ -117,6 +132,7 @@ export async function POST(request: Request) {
           },
           include: {
             tags: true,
+            category: true, // Include category information
           },
         });
       })
@@ -126,7 +142,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error creating journal entry:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    return NextResponse.json({ error: 'Failed to create journal entry', details: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
@@ -138,6 +154,7 @@ export async function GET(request: Request) {
         activities: {
           include: {
             tags: true,
+            category: true, // Include category information
           },
         },
       },
@@ -145,6 +162,7 @@ export async function GET(request: Request) {
         date: 'desc',
       },
     });
+
     return NextResponse.json(entries);
   } catch (error) {
     console.error('Error fetching journal entries:', error);

@@ -37,6 +37,7 @@ export async function POST(request: Request) {
             include: {
                 journalEntry: { select: { date: true } },
                 tags: true,
+                category: true,
             },
             orderBy: { journalEntry: { date: 'desc' } },
             take: 200, // Fetch a larger set of candidates for batch processing

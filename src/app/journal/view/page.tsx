@@ -2,26 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-
-interface Tag {
-    id: string;
-    name: string;
-}
-
-interface Activity {
-    id: string;
-    description: string;
-    duration: number | null;
-    notes: string | null;
-    category: string;
-    tags: Tag[];
-}
-
-interface JournalEntry {
-    id: string;
-    date: string;
-    activities: Activity[];
-}
+import { JournalEntry, Activity, Category } from '../../../types/journal';
 
 export default function ViewJournalEntries() {
     const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -70,6 +51,16 @@ export default function ViewJournalEntries() {
             month: 'long',
             day: 'numeric'
         });
+    };
+
+    // Helper function to group activities by category
+    const getActivitiesByCategory = (activities: Activity[], categoryName: string) => {
+        return activities.filter(activity => activity.category?.name === categoryName);
+    };
+
+    // Helper function to get category color
+    const getCategoryColor = (category: Category) => {
+        return category?.color || '#6B7280';
     };
 
     return (
@@ -134,7 +125,7 @@ export default function ViewJournalEntries() {
                                         <button
                                             key={entry.id}
                                             onClick={() => setSelectedEntry(entry)}
-                                            className={`w-full text-left p-3 rounded-lg ${selectedEntry?.id === entry.id
+                                            className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${selectedEntry?.id === entry.id
                                                 ? 'bg-blue-50 border-2 border-blue-200 text-blue-900'
                                                 : 'bg-slate-50 hover:bg-slate-100 border-2 border-transparent'
                                                 }`}
@@ -161,19 +152,21 @@ export default function ViewJournalEntries() {
                                             <h2 className="text-2xl font-bold text-slate-900">
                                                 {formatDate(selectedEntry.date)}
                                             </h2>
-                                            <div className="flex items-center gap-4">
-                                                <div className="flex items-center gap-2 text-sm text-slate-600">
-                                                    <div className="status-work"></div>
-                                                    <span>{selectedEntry.activities.filter(a => a.category === 'PROFESSIONAL').length} professional</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-sm text-slate-600">
-                                                    <div className="status-indicator bg-purple-500"></div>
-                                                    <span>{selectedEntry.activities.filter(a => a.category === 'PROJECT').length} project</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-sm text-slate-600">
-                                                    <div className="status-life"></div>
-                                                    <span>{selectedEntry.activities.filter(a => a.category === 'LIFE').length} life</span>
-                                                </div>
+                                            <div className="flex items-center gap-4 flex-wrap">
+                                                {/* Dynamic category stats */}
+                                                {Array.from(new Set(selectedEntry.activities.map(a => a.category?.name))).map(categoryName => {
+                                                    const categoryActivities = getActivitiesByCategory(selectedEntry.activities, categoryName);
+                                                    const category = categoryActivities[0]?.category;
+                                                    return (
+                                                        <div key={categoryName} className="flex items-center gap-2 text-sm text-slate-600">
+                                                            <div 
+                                                                className="w-2 h-2 rounded-full"
+                                                                style={{ backgroundColor: getCategoryColor(category) }}
+                                                            />
+                                                            <span>{categoryActivities.length} {categoryName?.toLowerCase()}</span>
+                                                        </div>
+                                                    );
+                                                })}
                                                 <Link
                                                     href={`/journal/new?date=${new Date(selectedEntry.date).toISOString().slice(0, 10)}`}
                                                     className="tech-button-secondary flex items-center gap-2 text-sm !py-2 !px-3"
@@ -187,125 +180,80 @@ export default function ViewJournalEntries() {
                                         </div>
                                     </div>
 
-                                    {/* Professional Activities */}
-                                    <div className="tech-card p-6">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="status-work"></div>
-                                            <h3 className="text-xl font-semibold text-slate-900">Professional Activities</h3>
-                                        </div>
-                                        {selectedEntry.activities.filter(a => a.category === 'PROFESSIONAL').length === 0 ? (
-                                            <p className="text-slate-500 italic">No professional activities recorded</p>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                {selectedEntry.activities
-                                                    .filter(activity => activity.category === 'PROFESSIONAL')
-                                                    .map(activity => (
-                                                        <div key={activity.id} className="activity-item border-l-4 border-blue-500">
-                                                            <div className="flex items-start justify-between mb-2">
-                                                                <h4 className="font-semibold text-slate-900">{activity.description}</h4>
-                                                                {activity.duration && (
-                                                                    <div className="tech-badge-blue">
-                                                                        {activity.duration}m
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            {activity.notes && (
-                                                                <p className="text-slate-700 mb-3">{activity.notes}</p>
-                                                            )}
-                                                            {Array.isArray(activity.tags) && activity.tags.length > 0 && (
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {activity.tags.map(tag => (
-                                                                        <span key={tag.id} className="tech-badge-blue">
-                                                                            #{tag.name}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                    {/* Dynamic Category Sections */}
+                                    {Array.from(new Set(selectedEntry.activities.map(a => a.category?.name))).map(categoryName => {
+                                        const categoryActivities = getActivitiesByCategory(selectedEntry.activities, categoryName);
+                                        const category = categoryActivities[0]?.category;
+                                        
+                                        if (!category) return null;
 
-                                    {/* Project Activities */}
-                                    <div className="tech-card p-6">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="status-indicator bg-purple-500"></div>
-                                            <h3 className="text-xl font-semibold text-slate-900">Project Activities</h3>
-                                        </div>
-                                        {selectedEntry.activities.filter(a => a.category === 'PROJECT').length === 0 ? (
-                                            <p className="text-slate-500 italic">No project activities recorded</p>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                {selectedEntry.activities
-                                                    .filter(activity => activity.category === 'PROJECT')
-                                                    .map(activity => (
-                                                        <div key={activity.id} className="activity-item border-l-4 border-purple-500">
-                                                            <div className="flex items-start justify-between mb-2">
-                                                                <h4 className="font-semibold text-slate-900">{activity.description}</h4>
-                                                                {activity.duration && (
-                                                                    <div className="tech-badge bg-purple-100 text-purple-800">
-                                                                        {activity.duration}m
+                                        return (
+                                            <div key={categoryName} className="tech-card p-6">
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <div 
+                                                        className="w-3 h-3 rounded-full"
+                                                        style={{ backgroundColor: getCategoryColor(category) }}
+                                                    />
+                                                    <h3 className="text-xl font-semibold text-slate-900">
+                                                        {category.name} Activities
+                                                    </h3>
+                                                    {category.description && (
+                                                        <span className="text-sm text-slate-500">
+                                                            {category.description}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                
+                                                {categoryActivities.length === 0 ? (
+                                                    <p className="text-slate-500 italic">No {categoryName?.toLowerCase()} activities recorded</p>
+                                                ) : (
+                                                    <div className="space-y-4">
+                                                        {categoryActivities.map(activity => (
+                                                            <div 
+                                                                key={activity.id} 
+                                                                className="activity-item border-l-4"
+                                                                style={{ borderLeftColor: getCategoryColor(category) }}
+                                                            >
+                                                                <div className="flex items-start justify-between mb-2">
+                                                                    <h4 className="font-semibold text-slate-900">{activity.description}</h4>
+                                                                    {activity.duration && (
+                                                                        <div 
+                                                                            className="tech-badge"
+                                                                            style={{ 
+                                                                                backgroundColor: `${getCategoryColor(category)}20`,
+                                                                                color: getCategoryColor(category)
+                                                                            }}
+                                                                        >
+                                                                            {activity.duration}m
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                {activity.notes && (
+                                                                    <p className="text-slate-700 mb-3">{activity.notes}</p>
+                                                                )}
+                                                                {Array.isArray(activity.tags) && activity.tags.length > 0 && (
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {activity.tags.map(tag => (
+                                                                            <span 
+                                                                                key={tag.id} 
+                                                                                className="tech-badge"
+                                                                                style={{ 
+                                                                                    backgroundColor: `${getCategoryColor(category)}20`,
+                                                                                    color: getCategoryColor(category)
+                                                                                }}
+                                                                            >
+                                                                                #{tag.name}
+                                                                            </span>
+                                                                        ))}
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                            {activity.notes && (
-                                                                <p className="text-slate-700 mb-3">{activity.notes}</p>
-                                                            )}
-                                                            {Array.isArray(activity.tags) && activity.tags.length > 0 && (
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {activity.tags.map(tag => (
-                                                                        <span key={tag.id} className="tech-badge bg-purple-100 text-purple-800">
-                                                                            #{tag.name}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ))}
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-
-                                    {/* Life Activities */}
-                                    <div className="tech-card p-6">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="status-life"></div>
-                                            <h3 className="text-xl font-semibold text-slate-900">Life Activities</h3>
-                                        </div>
-                                        {selectedEntry.activities.filter(a => a.category === 'LIFE').length === 0 ? (
-                                            <p className="text-slate-500 italic">No life activities recorded</p>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                {selectedEntry.activities
-                                                    .filter(activity => activity.category === 'LIFE')
-                                                    .map(activity => (
-                                                        <div key={activity.id} className="activity-item border-l-4 border-emerald-500">
-                                                            <div className="flex items-start justify-between mb-2">
-                                                                <h4 className="font-semibold text-slate-900">{activity.description}</h4>
-                                                                {activity.duration && (
-                                                                    <div className="tech-badge-green">
-                                                                        {activity.duration}m
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            {activity.notes && (
-                                                                <p className="text-slate-700 mb-3">{activity.notes}</p>
-                                                            )}
-                                                            {Array.isArray(activity.tags) && activity.tags.length > 0 && (
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {activity.tags.map(tag => (
-                                                                        <span key={tag.id} className="tech-badge-green">
-                                                                            #{tag.name}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <div className="tech-card p-12 text-center">
