@@ -7,9 +7,9 @@ The application is built with Next.js, TypeScript, and Prisma, and it uses a loc
 ## Core Features
 
 - **Structured Journaling**: Log daily activities under customizable categories.
-- **Dynamic Category Management**: Create, edit, and manage custom categories with colors and icons through a dedicated interface.
+- **Dynamic Category Management**: Create, edit, and manage custom categories with descriptions, colors, and icons.
 - **Detailed Activity Tracking**: For each activity, record a description, duration, detailed notes, and tags.
-- **LLM-Powered Data Import**: An import script uses an LLM to parse plain text journal entries, extract structured data, and populate the database.
+- **LLM-Powered Data Import**: A web-based feature uses an LLM to parse plain text journal entries, extract structured data, and populate the database, with real-time progress streaming.
 - **Web Interface**: A clean, user-friendly interface to create, view, edit, and search journal entries.
 - **Agentic Search**: Ask natural language questions about your journal and receive AI-generated summaries based on relevant entries.
 - **AI-Generated Weekly Reports**: Get automated, AI-powered summaries of your weekly activities, time allocation, and key trends.
@@ -33,7 +33,7 @@ The application is built with Next.js, TypeScript, and Prisma, and it uses a loc
 - Node.js (v18 or later)
 - npm or yarn
 - Docker and Docker Compose (for the database)
-- A running local LLM server (e.g., [Ollama](https://ollama.com/)) that exposes an OpenAI-compatible API endpoint. Make sure you have a model like `gemma3n` downloaded.
+- A running local LLM server (e.g., [Ollama](https://ollama.com/)) that exposes an OpenAI-compatible API endpoint. Make sure you have a model downloaded (I am using `hf.co/unsloth/Qwen3-8B-128K-GGUF:Q4_K_XL` with `8b` parameters and `16k` context window).
 
 ### Installation
 
@@ -73,9 +73,9 @@ The application is built with Next.js, TypeScript, and Prisma, and it uses a loc
 
     Update the following variables in your `.env` file:
 
-    - `DATABASE_URL`: Your PostgreSQL connection string
+    - `DATABASE_URL`: Your PostgreSQL connection string. (e.g., `postgresql://user:password@localhost:5432/synapse`)
     - `LLM_API_URL`: Your local LLM API endpoint (e.g., `http://localhost:11434/v1` for Ollama)
-    - `LLM_MODEL`: The model name to use (e.g., `gemma3n`)
+    - `LLM_MODEL`: The model name to use (e.g., `gemma2`)
 
 6.  **Run the application:**
     ```bash
@@ -85,44 +85,38 @@ The application is built with Next.js, TypeScript, and Prisma, and it uses a loc
 
 ### Setting Up Categories
 
-Before you start logging activities, you'll want to set up your categories:
+Before logging or importing activities, you must set up your categories:
 
-1. Navigate to `/categories` in the application
-2. Create custom categories that match your workflow (e.g., "Deep Work", "Meetings", "Exercise", "Learning")
-3. Assign colors and icons to make them easily identifiable
-4. Mark important categories as defaults if needed
+1.  Navigate to the `/categories` page in the application.
+2.  Create custom categories that match your workflow (e.g., "Deep Work", "Meetings", "Exercise", "Learning").
+3.  **Crucially, provide a clear description for each custom category.** The AI relies on these descriptions to accurately classify imported activities.
 
-### Importing Journal Entries
+### LLM-Powered Journal Import
 
-The project includes a powerful script to import historical journal entries from a text file.
+Synapse offers a powerful way to import historical or bulk journal entries from plain text using its AI-powered import feature.
 
-1.  Place your journal history in a text file (e.g., `scripts/journal-history-june.txt`). The file should contain entries with date headers in `YYYY-MM-DD` format.
-2.  Ensure your LLM server is running and properly configured
-3.  Run the import script:
-    ```bash
-    node scripts/import-journal-local.mjs
-    ```
-    The script will process each entry, use the configured LLM to extract structured data, and send it to the application's API to be stored in the database.
+1.  **Prepare your journal text**: Ensure your text is formatted with each day's entry starting on a new line with a date (e.g., `2024-07-25`).
+2.  **Verify categories**: Ensure you have created custom categories with descriptions for all activity types present in your journal text.
+3.  **Navigate to the Import page**: Go to the `/import` page in the application.
+4.  **Paste and Import**: Paste your journal text into the provided text area and click "Start Import". The application will stream the progress as the LLM processes and saves your entries.
 
 ## Database Schema
 
 The application uses a PostgreSQL database with the following key models:
 
-- **JournalEntry**: Daily journal entries with a unique date
-- **Activity**: Individual activities within a journal entry
-- **Category**: Customizable categories for organizing activities
-- **Tag**: Flexible tagging system for activities
-- **Report**: Stored weekly/monthly reports with AI-generated insights
+- **JournalEntry**: Daily journal entries with a unique date.
+- **Activity**: Individual activities within a journal entry.
+- **Category**: Customizable categories for organizing activities.
+- **Tag**: Flexible tagging system for activities.
+- **Report**: Stored weekly/monthly reports with AI-generated insights.
 
 ## API Endpoints
 
-The application provides several API endpoints:
-
-- `/api/journal` - CRUD operations for journal entries
-- `/api/journal/search` - AI-powered search functionality
-- `/api/categories` - Category management
-- `/api/reports` - Weekly report generation and retrieval
-- `/api/import` - Bulk import of journal entries
+- `/api/journal`: CRUD for journal entries.
+- `/api/journal/search`: AI-powered semantic search.
+- `/api/categories`: CRUD for categories.
+- `/api/reports`: Weekly report generation and retrieval.
+- `/api/import`: AI-powered bulk import of journal entries.
 
 ## Project Roadmap
 
@@ -139,29 +133,18 @@ A standard keyword search is limited. This feature allows a user to ask a natura
 
 ### ✅ Feature 2: Automated Weekly Reporting [Completed]
 
-To provide regular insights with minimal effort, the application can now generate automated weekly reports. These reports summarize time allocation between work and life, highlight key activities, analyze tag usage, and provide AI-driven insights into trends and patterns for the week. This feature is the first step towards a broader analytics and reporting dashboard.
+To provide regular insights with minimal effort, the application can now generate automated weekly reports. These reports summarize time allocation, highlight key activities, analyze tag usage, and provide AI-driven insights into trends and patterns for the week.
 
-### ✅ Feature 3: Dynamic Category Management [Completed]
+### ✅ Feature 3: Dynamic Categories & AI-Powered Import [Completed]
 
-The application now supports fully customizable categories instead of being limited to "Work" and "Life". Users can:
+The application has moved beyond static categories to a fully dynamic system, which is crucial for the AI-powered import pipeline. Users can now:
 
-- Create unlimited custom categories with descriptive names
-- Assign colors and icons for visual organization
-- Edit existing categories and their properties
-- Delete unused categories
-- Mark categories as defaults for quick access
+- **Manage Categories**: Create, edit, and delete custom categories with descriptions and colors. These descriptions are essential for the AI to accurately classify activities.
+- **LLM-Powered Bulk Import**: Instead of manual entry, users can paste unstructured, plain-text journal entries into the web UI. An LLM agent then parses the text, extracts activities, classifies them against the user-defined categories, and saves them to the database, providing a real-time log of the process.
 
 ### 🎤 Feature 4: Voice-to-Data Pipeline for Hands-Free Entry
 
-Typing is a point of friction. The next major UX improvement will be voice input. The plan is to integrate a speech-to-text model (like a self-hosted Whisper instance or a cloud API).
-
-The pipeline will be simple and modular:
-
-1.  User records their journal entry via microphone.
-2.  The audio is transcribed to raw text.
-3.  This raw text is fed into the exact same LLM data extraction endpoint we've already built.
-
-This reuses the core backend logic, making it an efficient way to add a powerful new input method.
+Typing is a point of friction. The next major UX improvement will be voice input. The plan is to integrate a speech-to-text model (like a self-hosted Whisper instance or a cloud API). The transcribed text will be fed into the existing LLM data extraction endpoint, reusing core backend logic for an efficient new input method.
 
 ### 📊 Feature 5: Advanced Correlation Analysis and Dashboards
 
@@ -173,23 +156,23 @@ With a growing dataset, we can build interactive dashboards to find correlations
 
 If you're experiencing issues with LLM integration:
 
-1. Ensure your local LLM server (e.g., Ollama) is running
-2. Verify the `LLM_API_URL` in your `.env` file is correct
-3. Check that your chosen model is downloaded and available
-4. Test the connection by running a simple query through the search interface
+1.  Ensure your local LLM server (e.g., Ollama) is running.
+2.  Verify the `LLM_API_URL` in your `.env` file is correct.
+3.  Check that your chosen model is downloaded and available.
+4.  Test the connection by running a simple query through the Search or Reports interface.
 
 ### Database Issues
 
 If you encounter database connection problems:
 
-1. Ensure Docker Compose is running: `docker-compose ps`
-2. Check your `DATABASE_URL` environment variable
-3. Try resetting the database schema: `npx prisma db push --force-reset`
+1.  Ensure Docker Compose is running: `docker-compose ps`.
+2.  Check your `DATABASE_URL` environment variable.
+3.  Try resetting the database schema: `npx prisma db push --force-reset` (Warning: this will delete all data).
 
-### Import Script Issues
+### Import Feature Issues
 
-If the import script fails:
+If the AI-powered import fails:
 
-1. Verify your journal file format matches the expected date headers (`YYYY-MM-DD`)
-2. Ensure categories are set up before importing
-3. Check the LLM server logs for any processing errors
+1.  Verify your journal text format. Each day should start with a date on a new line (e.g., `YYYY-MM-DD`).
+2.  Ensure all your **custom categories have descriptions**. The import will fail if any are missing, as the AI relies on them for classification. This is the most common cause of import failure.
+3.  Check the import log in the UI for specific error messages from the LLM or database.
