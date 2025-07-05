@@ -9,6 +9,7 @@ export default function ViewJournalEntries() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         async function fetchEntries() {
@@ -44,6 +45,47 @@ export default function ViewJournalEntries() {
 
         fetchEntries();
     }, []);
+
+    const handleDeleteEntry = async (entryId: string) => {
+        const entryToDelete = entries.find(entry => entry.id === entryId);
+        if (!entryToDelete) return;
+
+        const confirmMessage = `Are you sure you want to delete the journal entry for ${formatDate(entryToDelete.date)}? This action cannot be undone.`;
+        
+        if (!window.confirm(confirmMessage)) {
+            return;
+        }
+
+        setIsDeleting(true);
+        try {
+            const response = await fetch(`/api/journal/${entryId}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to delete entry');
+            }
+
+            // Remove the deleted entry from state
+            const updatedEntries = entries.filter(entry => entry.id !== entryId);
+            setEntries(updatedEntries);
+
+            // If the deleted entry was selected, select another one or clear selection
+            if (selectedEntry?.id === entryId) {
+                setSelectedEntry(updatedEntries.length > 0 ? updatedEntries[0] : null);
+            }
+
+            // Show success message (you could replace this with a toast notification)
+            alert('Journal entry deleted successfully!');
+
+        } catch (error: any) {
+            console.error('Error deleting entry:', error);
+            alert(`Failed to delete entry: ${error.message}`);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('en-US', {
@@ -167,26 +209,44 @@ export default function ViewJournalEntries() {
                                                         </div>
                                                     );
                                                 })}
-                                                <Link
-                                                    href={`/journal/new?date=${new Date(selectedEntry.date).toISOString().slice(0, 10)}`}
-                                                    className="tech-button-secondary flex items-center gap-2 text-sm !py-2 !px-3"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                    </svg>
-                                                    <span>Edit</span>
-                                                </Link>
+                                                <div className="flex items-center gap-2">
+                                                    <Link
+                                                        href={`/journal/new?date=${new Date(selectedEntry.date).toISOString().slice(0, 10)}`}
+                                                        className="tech-button-secondary flex items-center gap-2 text-sm !py-2 !px-3"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                        Edit
+                                                    </Link>
+                                                    <button
+                                                        onClick={() => handleDeleteEntry(selectedEntry.id)}
+                                                        disabled={isDeleting}
+                                                        className="flex items-center gap-2 text-sm py-2 px-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                    >
+                                                        {isDeleting ? (
+                                                            <>
+                                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                                Deleting...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                </svg>
+                                                                Delete
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Dynamic Category Sections */}
+                                    {/* Activities by Category */}
                                     {Array.from(new Set(selectedEntry.activities.map(a => a.category?.name))).map(categoryName => {
                                         const categoryActivities = getActivitiesByCategory(selectedEntry.activities, categoryName);
                                         const category = categoryActivities[0]?.category;
-                                        
-                                        if (!category) return null;
-
                                         return (
                                             <div key={categoryName} className="tech-card p-6">
                                                 <div className="flex items-center gap-3 mb-6">
@@ -194,63 +254,62 @@ export default function ViewJournalEntries() {
                                                         className="w-3 h-3 rounded-full"
                                                         style={{ backgroundColor: getCategoryColor(category) }}
                                                     />
-                                                    <h3 className="text-xl font-semibold text-slate-900">
-                                                        {category.name} Activities
+                                                    <h3 className="text-xl font-semibold text-slate-900 capitalize">
+                                                        {categoryName}
                                                     </h3>
-                                                    {category.description && (
-                                                        <span className="text-sm text-slate-500">
-                                                            {category.description}
-                                                        </span>
-                                                    )}
+                                                    <div 
+                                                        className="tech-badge"
+                                                        style={{ 
+                                                            backgroundColor: `${getCategoryColor(category)}20`,
+                                                            color: getCategoryColor(category)
+                                                        }}
+                                                    >
+                                                        {categoryActivities.length} activities
+                                                    </div>
                                                 </div>
-                                                
-                                                {categoryActivities.length === 0 ? (
-                                                    <p className="text-slate-500 italic">No {categoryName?.toLowerCase()} activities recorded</p>
-                                                ) : (
-                                                    <div className="space-y-4">
-                                                        {categoryActivities.map(activity => (
-                                                            <div 
-                                                                key={activity.id} 
-                                                                className="activity-item border-l-4"
-                                                                style={{ borderLeftColor: getCategoryColor(category) }}
-                                                            >
-                                                                <div className="flex items-start justify-between mb-2">
-                                                                    <h4 className="font-semibold text-slate-900">{activity.description}</h4>
-                                                                    {activity.duration && (
-                                                                        <div 
+                                                <div className="space-y-4">
+                                                    {categoryActivities.map((activity) => (
+                                                        <div 
+                                                            key={activity.id} 
+                                                            className="p-4 bg-slate-50 rounded-lg border-l-4"
+                                                            style={{ borderLeftColor: getCategoryColor(category) }}
+                                                        >
+                                                            <div className="flex items-start justify-between mb-2">
+                                                                <h4 className="font-semibold text-slate-900">{activity.description}</h4>
+                                                                {activity.duration && (
+                                                                    <div 
+                                                                        className="tech-badge"
+                                                                        style={{ 
+                                                                            backgroundColor: `${getCategoryColor(category)}20`,
+                                                                            color: getCategoryColor(category)
+                                                                        }}
+                                                                    >
+                                                                        {activity.duration}m
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {activity.notes && (
+                                                                <p className="text-slate-700 mb-3">{activity.notes}</p>
+                                                            )}
+                                                            {Array.isArray(activity.tags) && activity.tags.length > 0 && (
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {activity.tags.map(tag => (
+                                                                        <span 
+                                                                            key={tag.id} 
                                                                             className="tech-badge"
                                                                             style={{ 
                                                                                 backgroundColor: `${getCategoryColor(category)}20`,
                                                                                 color: getCategoryColor(category)
                                                                             }}
                                                                         >
-                                                                            {activity.duration}m
-                                                                        </div>
-                                                                    )}
+                                                                            #{tag.name}
+                                                                        </span>
+                                                                    ))}
                                                                 </div>
-                                                                {activity.notes && (
-                                                                    <p className="text-slate-700 mb-3">{activity.notes}</p>
-                                                                )}
-                                                                {Array.isArray(activity.tags) && activity.tags.length > 0 && (
-                                                                    <div className="flex flex-wrap gap-2">
-                                                                        {activity.tags.map(tag => (
-                                                                            <span 
-                                                                                key={tag.id} 
-                                                                                className="tech-badge"
-                                                                                style={{ 
-                                                                                    backgroundColor: `${getCategoryColor(category)}20`,
-                                                                                    color: getCategoryColor(category)
-                                                                                }}
-                                                                            >
-                                                                                #{tag.name}
-                                                                            </span>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         );
                                     })}
