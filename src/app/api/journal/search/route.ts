@@ -37,13 +37,14 @@ export async function POST(request: Request) {
             include: {
                 journalEntry: { select: { date: true } },
                 tags: true,
+                category: true,
             },
             orderBy: { journalEntry: { date: 'desc' } },
             take: 200, // Fetch a larger set of candidates for batch processing
         });
         
         // 3. Agentic Step: Re-ranker
-        const rankedActivities = await rerankActivities(query, candidateActivities);
+        const rankedActivities = await rerankActivities(query, candidateActivities as any);
         const topActivities = rankedActivities.slice(0, 20); // Take the top N for synthesis
 
         // 4. Synthesis Step: Use LLM to generate a summary from the results

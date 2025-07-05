@@ -3,14 +3,11 @@
 import { OpenAI } from 'openai';
 import * as z from 'zod/v4';
 
-// --- LLM Configuration ---
-const LLM_API_URL = 'http://localhost:11434/v1/';
-const LLM_MODEL = 'gemma3n:latest';
-
 const openai = new OpenAI({
-    baseURL: LLM_API_URL,
-    apiKey: 'ollama',
+    baseURL: process.env.LLM_API_URL,
+    apiKey: 'ollama', // Required but not used for local Ollama
 });
+
 
 // --- Zod Schemas ---
 const SearchTermsSchema = z.object({
@@ -38,7 +35,11 @@ interface Activity {
     description: string;
     duration: number | null;
     notes: string | null;
-    category: string;
+    category: {
+        id: string;
+        name: string;
+        color: string;
+    };
     journalEntry: {
         date: Date;
     };
@@ -72,7 +73,7 @@ export async function generateSearchTerms(query: string): Promise<string[]> {
 
         const completion = await Promise.race([
             openai.chat.completions.create({
-                model: LLM_MODEL,
+                model: process.env.LLM_MODEL,
                 messages: [{ role: 'user', content: prompt }],
                 temperature: 0.0,
                 response_format: { type: 'json_object' },
@@ -153,7 +154,7 @@ export async function rerankActivities(query: string, activities: Activity[]): P
 
         try {
             const completion = await openai.chat.completions.create({
-                model: LLM_MODEL,
+                model: process.env.LLM_MODEL,
                 messages: [{ role: 'user', content: prompt }],
                 temperature: 0.0,
                 response_format: {
@@ -274,7 +275,7 @@ export async function generateSummary(query: string, activities: Activity[]): Pr
         console.log('[SearchAgent] Generating structured summary...');
         const completion = await Promise.race([
             openai.chat.completions.create({
-                model: LLM_MODEL,
+                model: process.env.LLM_MODEL,
                 messages: [{ role: 'user', content: prompt }],
                 temperature: 0.2,
                 response_format: {

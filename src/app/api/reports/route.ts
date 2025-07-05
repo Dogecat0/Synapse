@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     });
     
     // 4. Generate the report content using the agent
-    const reportContent = await generateWeeklyReport(activities);
+    const reportContent = await generateWeeklyReport(activities as any);
     
     // 5. Update the report with the result
     if (reportContent) {

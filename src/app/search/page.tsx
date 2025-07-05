@@ -16,11 +16,15 @@ interface Activity {
     description: string;
     duration: number | null;
     notes: string | null;
-    category: 'WORK' | 'LIFE';
-    journalEntry: {
-        date: string;
+    category: {
+        id: string;
+        name: string;
+        color: string;
     };
-    tags: Tag[];
+    journalEntry: {
+        date: Date;
+    };
+    tags: { name: string }[];
 }
 
 interface SummarySection {
@@ -204,13 +208,13 @@ const SearchPage = () => {
                                 </h2>
                                 <div className="space-y-4">
                                     {result.activities.length > 0 ? result.activities.map(activity => (
-                                        <div key={activity.id} className={`activity-item border-l-4 ${activity.category === 'WORK' ? 'border-blue-500' : 'border-emerald-500'}`}>
+                                        <div key={activity.id} className={`activity-item border-l-4`} style={{ borderLeftColor: activity.category.color }}>
                                             <div className="flex items-start justify-between mb-2 flex-wrap gap-2">
                                                 <h4 className="font-semibold text-slate-900">{activity.description}</h4>
                                                 <div className="flex items-center gap-4 text-sm">
-                                                    <span className="text-slate-500">{formatDate(activity.journalEntry.date)}</span>
+                                                    <span className="text-slate-500">{formatDate(activity.journalEntry.date.toString())}</span>
                                                     {activity.duration && (
-                                                        <div className={activity.category === 'WORK' ? 'tech-badge-blue' : 'tech-badge-green'}>
+                                                        <div className={`activity-item border-l-4`} style={{ borderLeftColor: activity.category.color }}>
                                                             {activity.duration}m
                                                         </div>
                                                     )}
@@ -220,7 +224,7 @@ const SearchPage = () => {
                                             {activity.tags.length > 0 && (
                                                 <div className="flex flex-wrap gap-2">
                                                     {activity.tags.map(tag => (
-                                                        <span key={tag.id} className={activity.category === 'WORK' ? 'tech-badge-blue' : 'tech-badge-green'}>
+                                                        <span key={tag.name} className={`activity-item border-l-4`} style={{ borderLeftColor: activity.category.color }}>
                                                             #{tag.name}
                                                         </span>
                                                     ))}

@@ -1,121 +1,171 @@
 import { PrismaClient } from '@prisma/client';
 import { NextResponse } from 'next/server';
+import * as z from 'zod';
 
 const prisma = new PrismaClient();
 
+// Zod schema for validating a single activity in the request
+const ActivitySchema = z.object({
+  description: z.string().min(1),
+  duration: z.string().optional(),
+  notes: z.string().nullable().optional(),
+  tags: z.string().optional(),
+  categoryId: z.string().min(1), // Changed from category enum to categoryId
+});
+
+// Zod schema for the entire request body
+const JournalEntrySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  activities: z.array(ActivitySchema),
+  force: z.boolean().optional(),
+});
+
 export async function POST(request: Request) {
   try {
-    const { date, workActivities, lifeActivities, force } = await request.json();
+    const body = await request.json();
+    const validation = JournalEntrySchema.safeParse(body);
 
-    // Basic validation
-    if (!date) {
-      return NextResponse.json({ error: 'Date is required' }, { status: 400 });
+    if (!validation.success) {
+      return NextResponse.json({ error: 'Invalid input', details: validation.error.flatten() }, { status: 400 });
     }
 
-    // Check if entry exists and force flag is not set
-    if (!force) {
-      const existingEntry = await prisma.journalEntry.findUnique({
-        where: { date: new Date(date) }
-      });
+    const { date, activities, force = false } = validation.data;
+    const entryDate = new Date(date);
 
-      if (existingEntry) {
-        return NextResponse.json({ exists: true, error: 'Entry already exists for this date' }, { status: 409 });
-      }
-    }
-
-    const activitiesData = [
-      ...workActivities.map((activity: any) => ({
-        description: activity.description.trim(),
-        duration: parseInt(activity.duration, 10) || null,
-        notes: activity.notes || '',
-        category: 'WORK',
-        tags: activity.tags ? {
-          connectOrCreate: activity.tags.split(',')
-            .filter((tag: string) => tag.trim())
-            .map((tag: string) => ({
-              where: { name: tag.trim() },
-              create: { name: tag.trim() },
-            })),
-        } : undefined,
-      })),
-      ...lifeActivities.map((activity: any) => ({
-        description: activity.description.trim(),
-        duration: parseInt(activity.duration, 10) || null,
-        notes: activity.notes || '',
-        category: 'LIFE',
-        tags: activity.tags ? {
-          connectOrCreate: activity.tags.split(',')
-            .filter((tag: string) => tag.trim())
-            .map((tag: string) => ({
-              where: { name: tag.trim() },
-              create: { name: tag.trim() },
-            })),
-        } : undefined,
-      })),
-    ];
-
-    const journalEntry = await prisma.journalEntry.upsert({
-      where: { date: new Date(date) },
-      update: {
-        activities: {
-          deleteMany: {},
-          create: activitiesData,
-        },
-      },
-      create: {
-        date: new Date(date),
-        activities: {
-          create: activitiesData,
-        },
-      },
+    let journalEntry = await prisma.journalEntry.findUnique({
+      where: { date: entryDate },
+      include: { activities: true },
     });
-    return NextResponse.json(journalEntry, { status: 201 });
+
+    if (journalEntry && force) {
+      // Delete existing activities for this entry before creating new ones
+      await prisma.activity.deleteMany({
+        where: { journalEntryId: journalEntry.id },
+      });
+      // Update the entry itself (e.g., updatedAt)
+      journalEntry = await prisma.journalEntry.update({
+        where: { id: journalEntry.id },
+        data: { updatedAt: new Date() },
+        include: { activities: true },
+      });
+    } else if (journalEntry) {
+      return NextResponse.json({ error: 'An entry for this date already exists. Use "force=true" to overwrite.' }, { status: 409 });
+    } else {
+      // Create a new journal entry if it doesn't exist
+      journalEntry = await prisma.journalEntry.create({
+        data: { date: entryDate },
+        include: { activities: true },
+      });
+    }
+
+    // Validate that all category IDs exist
+    const categoryIds = [...new Set(activities.map(a => a.categoryId))];
+    const existingCategories = await prisma.category.findMany({
+      where: { id: { in: categoryIds } },
+      select: { id: true }
+    });
+    
+    const existingCategoryIds = new Set(existingCategories.map(c => c.id));
+    const invalidCategoryIds = categoryIds.filter(id => !existingCategoryIds.has(id));
+    
+    if (invalidCategoryIds.length > 0) {
+      return NextResponse.json({ 
+        error: 'Invalid category IDs', 
+        invalidCategories: invalidCategoryIds 
+      }, { status: 400 });
+    }
+
+    // First, collect all unique tag names from all activities
+    const allTagNames = new Set<string>();
+    activities.forEach(activity => {
+      const { tags } = activity;
+      if (tags) {
+        tags.split(',').map(t => t.trim()).filter(Boolean).forEach(tag => allTagNames.add(tag));
+      }
+    });
+
+    // Pre-create or fetch all tags to avoid parallel creation conflicts
+    const tagMap = new Map();
+    await Promise.all(
+      Array.from(allTagNames).map(async (name) => {
+        try {
+          const tag = await prisma.tag.upsert({
+            where: { name },
+            update: {}, // No update needed
+            create: { name },
+          });
+          tagMap.set(name, tag);
+        } catch (error) {
+          // If tag already exists, try to fetch it
+          try {
+            const existingTag = await prisma.tag.findUnique({ where: { name } });
+            if (existingTag) tagMap.set(name, existingTag);
+          } catch (fetchError) {
+            console.error(`Failed to handle tag "${name}":`, fetchError);
+          }
+        }
+      })
+    );
+
+    // Create activities and connect them to the journal entry
+    const createdActivities = await Promise.all(
+      activities.map(async (activity) => {
+        const { tags, ...activityData } = activity;
+        const tagNames = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+        
+        // Get tag IDs that we've already created/fetched
+        const tagIds = tagNames
+          .filter(name => tagMap.has(name))
+          .map(name => ({ id: tagMap.get(name).id }));
+
+        return prisma.activity.create({
+          data: {
+            description: activity.description,
+            duration: activity.duration ? parseInt(activity.duration, 10) : null,
+            notes: activityData.notes || null,
+            journalEntryId: journalEntry.id,
+            categoryId: activity.categoryId,
+            tags: {
+              // Just connect to existing tags instead of trying to create them again
+              connect: tagIds,
+            },
+          },
+          include: {
+            tags: true,
+            category: true, // Include category information
+          },
+        });
+      })
+    );
+
+    return NextResponse.json({ ...journalEntry, activities: createdActivities }, { status: 201 });
   } catch (error) {
     console.error('Error creating journal entry:', error);
-    return NextResponse.json({ error: 'Error creating journal entry' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
-// Add a GET endpoint to retrieve journal entries
+// GET endpoint to retrieve journal entries
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const date = searchParams.get('date');
-
-    if (date) {
-      const entry = await prisma.journalEntry.findUnique({
-        where: { date: new Date(date) },
-        include: {
-          activities: {
-            include: {
-              tags: true
-            }
-          }
-        },
-      });
-
-      if (!entry) {
-        return NextResponse.json(null);
-      }
-
-      return NextResponse.json(entry);
-    }
-
-    // Get all entries if no date specified
     const entries = await prisma.journalEntry.findMany({
-      orderBy: { date: 'desc' },
       include: {
         activities: {
           include: {
-            tags: true
-          }
-        }
+            tags: true,
+            category: true, // Include category information
+          },
+        },
+      },
+      orderBy: {
+        date: 'desc',
       },
     });
 
     return NextResponse.json(entries);
   } catch (error) {
     console.error('Error fetching journal entries:', error);
-    return NextResponse.json({ error: 'Error fetching journal entries' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch journal entries' }, { status: 500 });
   }
 }

@@ -1,22 +1,22 @@
-import { OpenAI } from 'openai';
 import * as z from 'zod/v4';
-import { Prisma } from '@prisma/client';
+import { OpenAI } from 'openai';
 
-// --- LLM Configuration ---
-const LLM_API_URL = 'http://localhost:11434/v1/';
-const LLM_MODEL = 'gemma3n:latest';
 
 const openai = new OpenAI({
-    baseURL: LLM_API_URL,
+    baseURL: process.env.LLM_API_URL,
     apiKey: 'ollama', // Required but not used for local Ollama
 });
 
 // --- Type Definitions ---
 type ActivityForReport = {
     description: string;
-    duration: number;
-    notes: string;
-    category: string;
+    duration: number | null;
+    notes: string | null;
+    category: {
+        id: string;
+        name: string;
+        color: string;
+    };
     journalEntry: { date: Date };
     tags: { name: string }[];
 };
@@ -27,15 +27,16 @@ export const WeeklyReportSchema = z.object({
   summary: z.string().describe("A 3-4 sentence narrative summary of the week's key activities, achievements, and work-life balance."),
   timeAnalysis: z.object({
     totalMinutes: z.number(),
-    workMinutes: z.number(),
+    professionalMinutes: z.number(),
+    projectMinutes: z.number(),
     lifeMinutes: z.number(),
-    workLifeRatio: z.string().describe("e.g., '60% Work / 40% Life'"),
+    breakdownRatio: z.string().describe("e.g., '50% Professional / 20% Project / 30% Life'"),
   }).describe("Breakdown of time allocation."),
-  keyActivities: z.array(z.object({
-    category: z.enum(['WORK', 'LIFE']),
+keyActivities: z.array(z.object({
+    categoryName: z.string().describe("The name of the category (e.g., 'Professional', 'Project', 'Life', etc.)"),
     description: z.string(),
     timeSpent: z.number().optional()
-  })).min(3).max(5).describe("List of 3-5 most significant activities or accomplishments."),
+})).min(3).max(5).describe("List of 3-5 most significant activities or accomplishments."),
   tagAnalysis: z.array(z.object({
       tag: z.string(),
       minutes: z.number(),
@@ -90,7 +91,7 @@ export async function generateWeeklyReport(activities: ActivityForReport[]): Pro
         console.log('[ReportAgent] Generating weekly report...');
         const completion = await Promise.race([
             openai.chat.completions.create({
-                model: LLM_MODEL,
+                model: process.env.LLM_MODEL,
                 messages: [{ role: 'user', content: prompt }],
                 temperature: 0.1,
                 response_format: {
