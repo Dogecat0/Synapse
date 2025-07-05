@@ -19,25 +19,34 @@ model JournalEntry {
 }
 
 model Activity {
-  id          String           @id @default(cuid())
+  id          String   @id @default(cuid())
   description String
   duration    Int? // Duration in minutes
   notes       String?
-  category    ActivityCategory
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id])
   journalEntryId String
 
+  category   Category @relation(fields: [categoryId], references: [id])
+  categoryId String
+
   tags Tag[]
 }
 
-// Add the new enum
-enum ActivityCategory {
-  PROFESSIONAL // 9-5 work
-  PROJECT // side project, personal work
-  LIFE // personal activities
+// New Category model for dynamic categories
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  color       String   @default("#6B7280") // Default gray color
+  icon        String? // Optional icon identifier
+  isDefault   Boolean  @default(false) // Mark system default categories
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  activities Activity[]
 }
 
 model Tag {
