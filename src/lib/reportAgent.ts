@@ -1,6 +1,11 @@
-import { OpenAI } from 'openai';
 import * as z from 'zod/v4';
-import { LLM_MODEL, openai } from './llmConfig';
+import { OpenAI } from 'openai';
+
+
+const openai = new OpenAI({
+    baseURL: process.env.LLM_API_URL,
+    apiKey: 'ollama', // Required but not used for local Ollama
+});
 
 // --- Type Definitions ---
 type ActivityForReport = {
@@ -82,7 +87,7 @@ export async function generateWeeklyReport(activities: ActivityForReport[]): Pro
         console.log('[ReportAgent] Generating weekly report...');
         const completion = await Promise.race([
             openai.chat.completions.create({
-                model: LLM_MODEL,
+                model: process.env.LLM_MODEL,
                 messages: [{ role: 'user', content: prompt }],
                 temperature: 0.1,
                 response_format: {
