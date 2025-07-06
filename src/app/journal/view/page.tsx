@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { JournalEntry, Activity, Category } from '../../../types/journal';
+import { JournalEntry, Activity, Category } from '../../../types/models';
 
 export default function ViewJournalEntries() {
     const [entries, setEntries] = useState<JournalEntry[]>([]);

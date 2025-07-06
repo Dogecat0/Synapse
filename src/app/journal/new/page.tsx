@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Category } from '../../../types/journal';
+import { Category } from '../../../types/models';
 
 function NewJournalEntryContent() {
   const router = useRouter();

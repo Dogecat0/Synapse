@@ -4,50 +4,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
+import { SearchResult, Summary } from '../../types/agents';
 
-// --- Type Definitions ---
-interface Tag {
-    id: string;
-    name: string;
-}
-
-interface Activity {
-    id: string;
-    description: string;
-    duration: number | null;
-    notes: string | null;
-    category: {
-        id: string;
-        name: string;
-        color: string;
-    };
-    journalEntry: {
-        date: Date;
-    };
-    tags: { name: string }[];
-}
-
-interface SummarySection {
-    title: string;
-    content: string;
-}
-
-interface TimeSpent {
-    totalMinutes?: number;
-    breakdown?: string;
-}
-
-interface Summary {
-    mainSummary: string;
-    sections?: SummarySection[];
-    timeSpent?: TimeSpent;
-}
-
-interface SearchResult {
-    summary: Summary;
-    activities: Activity[];
-    keywords: string[];
-}
 
 // --- Helper Components ---
 const formatDate = (dateString: string) => {

@@ -3,7 +3,7 @@
 import { OpenAI } from 'openai';
 import * as z from 'zod/v4';
 import { PrismaClient } from '@prisma/client';
-import { Category } from '../types/journal';
+import { Category } from '../types/models';
 
 // Instantiate Prisma client here for direct database access
 const prisma = new PrismaClient();

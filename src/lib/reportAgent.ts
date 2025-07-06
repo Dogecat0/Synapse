@@ -1,25 +1,12 @@
 import * as z from 'zod/v4';
 import { OpenAI } from 'openai';
+import { Activity } from '../types/models';
 
 
 const openai = new OpenAI({
     baseURL: process.env.LLM_API_URL,
     apiKey: 'ollama', // Required but not used for local Ollama
 });
-
-// --- Type Definitions ---
-type ActivityForReport = {
-    description: string;
-    duration: number | null;
-    notes: string | null;
-    category: {
-        id: string;
-        name: string;
-        color: string;
-    };
-    journalEntry: { date: Date };
-    tags: { name: string }[];
-};
 
 // --- Zod Schemas for LLM Output Validation ---
 export const WeeklyReportSchema = z.object({
@@ -49,7 +36,7 @@ export type WeeklyReportContent = z.infer<typeof WeeklyReportSchema>;
 
 // --- Prompt Engineering ---
 
-function createWeeklyReportPrompt(activities: ActivityForReport[], schema: any): string {
+function createWeeklyReportPrompt(activities: Activity[], schema: any): string {
     const activityContext = activities.map(act => {
         const date = new Date(act.journalEntry.date).toISOString().split('T')[0];
         const duration = act.duration ? `${act.duration}min` : 'N/A';
@@ -79,7 +66,7 @@ Notes: ${act.notes || 'N/A'}`;
 
 // --- Agent Functions ---
 
-export async function generateWeeklyReport(activities: ActivityForReport[]): Promise<WeeklyReportContent | null> {
+export async function generateWeeklyReport(activities: Activity[]): Promise<WeeklyReportContent | null> {
     if (activities.length === 0) {
         return null;
     }
