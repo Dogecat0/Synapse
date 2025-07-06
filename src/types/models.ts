@@ -27,6 +27,7 @@ export interface Activity {
   category: Category;
   categoryId: string;
   tags: Tag[];
+  journalEntry: JournalEntry;
 }
 
 export interface JournalEntry {

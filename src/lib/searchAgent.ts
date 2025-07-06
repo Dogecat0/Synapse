@@ -2,6 +2,7 @@
 
 import { OpenAI } from 'openai';
 import * as z from 'zod/v4';
+import { Activity } from '../types/models';
 
 const openai = new OpenAI({
     baseURL: process.env.LLM_API_URL,
@@ -28,23 +29,6 @@ const SummarySchema = z.object({
         breakdown: z.string().optional().describe("A brief breakdown of how time was spent across different activities")
     }).optional().describe("Information about time allocation, if relevant to the query")
 });
-
-// --- Helper Types ---
-interface Activity {
-    id: string;
-    description: string;
-    duration: number | null;
-    notes: string | null;
-    category: {
-        id: string;
-        name: string;
-        color: string;
-    };
-    journalEntry: {
-        date: Date;
-    };
-    tags: { name: string }[];
-}
 
 
 // --- Query Planner Agent---

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Category } from '../types/journal';
+import { Category } from '../types/models';
 
 interface CategoryManagerProps {
   onCategorySelect?: (category: Category) => void;
